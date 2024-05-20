@@ -1,6 +1,8 @@
 parameters:
   - name: deployDev
     type: boolean
+  - name: deployQA
+    type: boolean
 
 variables:
   ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')) }}:
@@ -16,12 +18,17 @@ variables:
 
   ${{ if eq(variables['build.type.manual'], 'true') }}:
     deploy.dev: ${{ parameters.deployDev }}
+    deploy.qa: ${{ parameters.deployQA }}
   ${{ if and(ne(variables['build.type.manual'], 'true'), eq(variables['build.type.release'], 'true')) }}:
     deploy.dev: 'true'
+    deploy.qa: 'true'
   ${{ if and(ne(variables['build.type.manual'], 'true'), ne(variables['build.type.release'], 'true')) }}:
     deploy.dev: 'false'
+    deploy.qa: 'false'
 
   ${{ if eq(variables['build.type.release'], 'true') }}:
+    deploy.staging: 'true'
     deploy.prod: 'true'
   ${{ if ne(variables['build.type.release'], 'true') }}:
+    deploy.staging: 'false'
     deploy.prod: 'false'

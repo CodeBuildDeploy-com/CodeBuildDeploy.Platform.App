@@ -1,0 +1,5 @@
+variables:
+  Acr.Repository.Connect: "codebuilddeploy-acr"
+  Acr.Repository.Name: "codebuilddeploy"
+  
+  Helm.Chart.BaseUrl: oci://${{ variables['Acr.Repository.Name'] }}.azurecr.io/helm
