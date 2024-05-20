@@ -13,6 +13,11 @@ parameters:
     type: boolean
     default: false
 
+  - name: deployQA
+    displayName: Deploy to QA (must Deploy to Dev too)
+    type: boolean
+    default: false
+
 resources:
   repositories:
   - repository: self
@@ -20,23 +25,30 @@ resources:
     type: git
     name: 'CodeBuildDeploy.Platform'
 
-
 variables:
-# Group variables
 - group: CodeBuildDeploy-Global
 
 - template: azureDevOps/variables-infrastructure.yml@platform
+- template: variables-infrastructure.yml
 
-- template: variables-build.yml
+- template: azureDevOps/variables-build.yml@platform
+- template: variables-env.yml
   parameters:
+    isManual: ${{ variables['build.type.manual'] }}
+    isRelease: ${{ variables['build.type.release'] }}
     deployDev: ${{ parameters.deployDev }}
+    deployQA: ${{ parameters.deployQA }}
 
-# Versioning
 - template: azureDevOps/variables-versioning.yml@platform
   parameters:
     buildTypeRelease: ${{ variables['build.type.release'] }}
     majorVersion: 1
     minorVersion: 0
+
+- name: Service.Blogs.NameKebabCase
+  value: 'codebuilddeploy-blogs'
+- name: Service.Blogs.Version
+  value: 1.1.37
 
 name: $[variables['Build.Number']]
 
@@ -61,6 +73,7 @@ stages:
         echo "Version Major = $(Version.Major)"
         echo "Version Minor = $(Version.Minor)"
         echo "Version Patch = $(Version.Patch)"
+        echo "Blogs Service Version = $(Service.Blogs.Version)"
       displayName: Output Version
 
   - ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
@@ -80,15 +93,17 @@ stages:
         displayName: Tag Version in Git
 
 - ${{ if eq(variables['deploy.dev'], 'true') }}:
-  - stage: Provision_NonProd
-    displayName: Provision NonProd Infra
+  - stage: DeployDev
+    displayName: Deploy NonProd Development Platform
     dependsOn:
-      - Build_Umbrella
+    - Build_Umbrella
+    variables:
+    - group: CodeBuildDeploy-NonProd-Dev
     jobs:
 
     - ${{ if ne(variables['build.type.release'], 'true') }}:
       - deployment: Provision_Dyn
-        displayName: Provision NonProd Dyn Environment
+        displayName: Provision Dyn Environment
         environment: NonProd-Dyn
         strategy:
           runOnce:
@@ -107,7 +122,7 @@ stages:
 
     - ${{ if eq(variables['build.type.release'], 'true') }}:
       - deployment: Provision_Dev
-        displayName: Provision NonProd Dev Environment
+        displayName: Provision Dev Environment
         environment: NonProd-Dev
         strategy:
           runOnce:
@@ -123,3 +138,36 @@ stages:
                   tfstate_file_name: 'nonprod-dev'
                   spoke_vars_file_name: 'dev'
                   additional_command_options: '-var="platform_env=nonprod" -var="app_env=dev"'
+
+    - template: app-deployment.yml
+      parameters:
+        azureDevOpsEnvironment: 'NonProd-Dev'
+        azureSubscription: '$(Azure.Subscription.NonProd)'
+        acrRepositoryConnect: '$(Acr.Repository.Connect)'
+        containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+        platformEnv: 'nonprod'
+        appEnv: 'dev'
+        serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
+        serviceVersion: '$(Service.Blogs.Version)'
+
+  - ${{ if eq(variables['deploy.prod'], 'true') }}:
+    - stage: DeployProd
+      displayName: Deploy Prod-Live
+      dependsOn:
+      - DeployDev
+      jobs:
+      - deployment: DeployProd
+        displayName: Deploy Blogs service Prod
+        environment: Prod-Live
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: AzureContainerApps@1
+                displayName: 'Azure Container App Deploy: codebuilddeploy'
+                inputs:
+                  azureSubscription: '$(Azure.Subscription.Prod)'
+                  containerAppName: '$(Service.Blogs.NameKebabCase)'
+                  resourceGroup: 'codebuilddeploy-rg'
+                  imageToDeploy: '$(Acr.Repository.Name).azurecr.io/$(Service.Blogs.NameKebabCase):$(Service.Blogs.Version)'
+                  targetPort: '8080'
