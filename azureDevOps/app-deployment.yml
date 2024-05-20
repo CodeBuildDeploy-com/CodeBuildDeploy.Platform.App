@@ -1,0 +1,99 @@
+parameters:
+- name: azureSubscription
+  type: string
+- name: acrRepositoryConnect
+  type: string
+- name: containerRegistry
+  type: string
+- name: platformEnv
+  type: string
+- name: appEnvShort
+  type: string
+- name: appEnv
+  type: string
+- name: kubernetesNamespace
+  type: string
+- name: serviceNameKebabCase
+  type: string
+- name: serviceVersion
+  type: string
+
+steps:
+- checkout: none
+
+- task: Kubernetes@1
+  displayName: Create K8s Namespace
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscriptionEndpoint: "${{ parameters.azureSubscription }}"
+    azureResourceGroup: "cbd-${{ parameters.platformEnv }}-rg"
+    kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
+    useClusterAdmin: true
+    command: 'apply'
+    useConfigurationFile: true
+    configurationType: 'inline'
+    inline: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: ${{ parameters.kubernetesNamespace }}
+    secretType: 'dockerRegistry'
+    containerRegistryType: 'Azure Container Registry'
+
+- task: KubernetesManifest@1
+  displayName: Create Docker Secret to pull images from ACR
+  inputs:
+    connectionType: azureResourceManager
+    azureSubscriptionConnection: "${{ parameters.azureSubscription }}"
+    azureResourceGroup: "cbd-${{ parameters.platformEnv }}-rg"
+    kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
+    useClusterAdmin: true
+    action: createSecret
+    secretType: dockerRegistry
+    secretName: "cbd-pull-secret"
+    dockerRegistryEndpoint: "${{ parameters.acrRepositoryConnect }}"
+    namespace: "${{ parameters.kubernetesNamespace }}"
+
+- task: Kubernetes@1
+  displayName: Create K8s secrets
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscriptionEndpoint: "${{ parameters.azureSubscription }}"
+    azureResourceGroup: "cbd-${{ parameters.platformEnv }}-rg"
+    kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
+    useClusterAdmin: true
+    namespace: "${{ parameters.kubernetesNamespace }}"
+    secretType: 'generic'
+    secretArguments: >
+        --from-literal=ConnectionStrings__BlogConnection="$(ConnectionStrings_BlogConnection)"
+        --from-literal=ConnectionStrings__AccountConnection="$(ConnectionStrings_AccountConnection)"
+        --from-literal=BlogsEndpointUrl="$(BlogsEndpointUrl)"
+    secretName: "cbd-${{ parameters.appEnvShort }}-secret"
+
+- task: AzureCLI@2
+  displayName: ACR Login
+  inputs:
+    azureSubscription: "${{ parameters.azureSubscription }}"
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      az acr login --name ${{ parameters.containerRegistry }}
+
+- task: HelmDeploy@0
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscription: "${{ parameters.azureSubscription }}"
+    azureResourceGroup: "cbd-${{ parameters.platformEnv }}-rg"
+    kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
+    useClusterAdmin: true
+    command: 'upgrade'
+    arguments: '--timeout 450s'
+    install: true
+    namespace: "${{ parameters.kubernetesNamespace }}"
+    releaseName: "${{ parameters.appEnv }}-${{ parameters.serviceNameKebabCase }}"
+    chartType: 'Name'
+    chartName: "oci://${{ parameters.containerRegistry }}/helm/${{ parameters.serviceNameKebabCase }}"
+    chartVersion: "${{ parameters.serviceVersion }}"
+    overrideValues: |
+      env.name=${{ parameters.appEnv }}
+      env.shortName=${{ parameters.appEnvShort }}

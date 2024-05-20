@@ -13,6 +13,11 @@ parameters:
     type: boolean
     default: false
 
+  - name: deployQA
+    displayName: Deploy to QA (must Deploy to Dev too)
+    type: boolean
+    default: false
+
 resources:
   repositories:
   - repository: self
@@ -20,23 +25,35 @@ resources:
     type: git
     name: 'CodeBuildDeploy.Platform'
 
-
 variables:
-# Group variables
 - group: CodeBuildDeploy-Global
 
 - template: azureDevOps/variables-infrastructure.yml@platform
+- template: variables-infrastructure.yml
 
-- template: variables-build.yml
+- template: azureDevOps/variables-build.yml@platform
+- template: variables-env.yml
   parameters:
+    isManual: ${{ variables['build.type.manual'] }}
+    isRelease: ${{ variables['build.type.release'] }}
     deployDev: ${{ parameters.deployDev }}
+    deployQA: ${{ parameters.deployQA }}
 
-# Versioning
 - template: azureDevOps/variables-versioning.yml@platform
   parameters:
     buildTypeRelease: ${{ variables['build.type.release'] }}
     majorVersion: 1
     minorVersion: 0
+
+- name: Service.Blogs.NameKebabCase
+  value: 'codebuilddeploy-blogs'
+- name: Service.Blogs.Version
+  value: 1.1.37
+
+- name: Service.Web.NameKebabCase
+  value: 'codebuilddeploy'
+- name: Service.Web.Version
+  value: 1.1.19
 
 name: $[variables['Build.Number']]
 
@@ -61,6 +78,7 @@ stages:
         echo "Version Major = $(Version.Major)"
         echo "Version Minor = $(Version.Minor)"
         echo "Version Patch = $(Version.Patch)"
+        echo "Blogs Service Version = $(Service.Blogs.Version)"
       displayName: Output Version
 
   - ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
@@ -80,46 +98,113 @@ stages:
         displayName: Tag Version in Git
 
 - ${{ if eq(variables['deploy.dev'], 'true') }}:
-  - stage: Provision_NonProd
-    displayName: Provision NonProd Infra
+  - stage: DeployDev
+    displayName: Deploy NonProd Development Platform
     dependsOn:
-      - Build_Umbrella
+    - Build_Umbrella
+    variables:
+    - group: CodeBuildDeploy-NonProd-Dev
+    - name: Deploy.PlatformEnv
+      value: nonprod
+    - ${{ if ne(variables['build.type.release'], 'true') }}:
+      - name: Deploy.AppEnvShortCap
+        value: Dyn
+      - name: Deploy.AppEnvShort
+        value: dyn
+      - name: Deploy.AppEnv
+        value: "dyn-${{ variables['Build.SourceVersion.Short'] }}"
+    - ${{ if eq(variables['build.type.release'], 'true') }}:
+      - name: Deploy.AppEnvShortCap
+        value: Dev
+      - name: Deploy.AppEnvShort
+        value: dev
+      - name: Deploy.AppEnv
+        value: dev
     jobs:
 
-    - ${{ if ne(variables['build.type.release'], 'true') }}:
-      - deployment: Provision_Dyn
-        displayName: Provision NonProd Dyn Environment
-        environment: NonProd-Dyn
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-              - template: azureDevOps/template-terraform.yml@platform
-                parameters: 
-                  service_connection: '$(Azure.Subscription.NonProd)'
-                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform/app_env'
-                  tfstate_rg_name: $(Tf.State.NonProd.RG)
-                  tfstate_storage_account_name: $(Tf.State.NonProd.SA)
-                  tfstate_blob_name: $(Tf.State.NonProd.Blob)
-                  tfstate_file_name: 'nonprod-dyn-$(Build.SourceVersion.Short)'
-                  spoke_vars_file_name: 'dyn'
-                  additional_command_options: '-var="platform_env=nonprod" -var="app_env=dyn-$(Build.SourceVersion.Short)"'
+    - deployment: Provision
+      displayName: Provision ${{ variables['Deploy.AppEnvShortCap'] }} Environment
+      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - template: azureDevOps/template-terraform.yml@platform
+              parameters: 
+                service_connection: '$(Azure.Subscription.NonProd)'
+                terraform_work_directory: '$(Build.SourcesDirectory)/terraform/app_env'
+                tfstate_rg_name: $(Tf.State.NonProd.RG)
+                tfstate_storage_account_name: $(Tf.State.NonProd.SA)
+                tfstate_blob_name: $(Tf.State.NonProd.Blob)
+                tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
+                spoke_vars_file_name: '$(Deploy.AppEnvShort)'
+                additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
 
-    - ${{ if eq(variables['build.type.release'], 'true') }}:
-      - deployment: Provision_Dev
-        displayName: Provision NonProd Dev Environment
-        environment: NonProd-Dev
+    - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Blogs"
+      displayName: "Deploy Blogs to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - template: app-deployment.yml
+              parameters:
+                azureSubscription: '$(Azure.Subscription.NonProd)'
+                acrRepositoryConnect: '$(Acr.Repository.Connect)'
+                containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                platformEnv: '$(Deploy.PlatformEnv)'
+                appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
+                appEnv: '$(Deploy.AppEnv)'
+                kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
+                serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
+                serviceVersion: '$(Service.Blogs.Version)'
+        
+    - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
+      displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - template: app-deployment.yml
+              parameters:
+                azureSubscription: '$(Azure.Subscription.NonProd)'
+                acrRepositoryConnect: '$(Acr.Repository.Connect)'
+                containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                platformEnv: '$(Deploy.PlatformEnv)'
+                appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
+                appEnv: '$(Deploy.AppEnv)'
+                kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
+                serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
+                serviceVersion: '$(Service.Web.Version)'
+
+  - ${{ if eq(variables['deploy.prod'], 'true') }}:
+    - stage: DeployProd
+      displayName: Deploy Prod-Live
+      dependsOn:
+      - DeployDev
+      jobs:
+      - deployment: DeployProd
+        displayName: Deploy Blogs service Prod
+        environment: Prod-Live
         strategy:
           runOnce:
             deploy:
               steps:
-              - template: azureDevOps/template-terraform.yml@platform
-                parameters: 
-                  service_connection: '$(Azure.Subscription.NonProd)'
-                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform/app_env'
-                  tfstate_rg_name: $(Tf.State.NonProd.RG)
-                  tfstate_storage_account_name: $(Tf.State.NonProd.SA)
-                  tfstate_blob_name: $(Tf.State.NonProd.Blob)
-                  tfstate_file_name: 'nonprod-dev'
-                  spoke_vars_file_name: 'dev'
-                  additional_command_options: '-var="platform_env=nonprod" -var="app_env=dev"'
+              - task: AzureContainerApps@1
+                displayName: 'Azure Container App Deploy: codebuilddeploy'
+                inputs:
+                  azureSubscription: '$(Azure.Subscription.Prod)'
+                  containerAppName: '$(Service.Blogs.NameKebabCase)'
+                  resourceGroup: 'codebuilddeploy-rg'
+                  imageToDeploy: '$(Acr.Repository.Name).azurecr.io/$(Service.Blogs.NameKebabCase):$(Service.Blogs.Version)'
+                  targetPort: '8080'
+
+              - task: AzureContainerApps@1
+                displayName: 'Azure Container App Deploy: codebuilddeploy'
+                inputs:
+                  azureSubscription: '$(Azure.Subscription.Prod)'
+                  containerAppName: '$(Service.Web.NameKebabCase)'
+                  resourceGroup: 'codebuilddeploy-rg'
+                  imageToDeploy: '$(Acr.Repository.Name).azurecr.io/$(Service.Web.NameKebabCase):$(Service.Web.Version)'
+                  targetPort: '8080'
