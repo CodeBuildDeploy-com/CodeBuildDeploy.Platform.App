@@ -9,7 +9,13 @@ parameters:
   type: string
 - name: platformEnv
   type: string
+- name: appEnvShort
+  type: string
+- name: appEnvShortLower
+  type: string
 - name: appEnv
+  type: string
+- name: serviceNameShort
   type: string
 - name: serviceNameKebabCase
   type: string
@@ -17,7 +23,7 @@ parameters:
   type: string
 
 jobs:
-- deployment: Deploy
+- deployment: "Deploy_${{ parameters.appEnvShort }}_${{ parameters.serviceNameShort }}"
   displayName: "Deploy ${{ parameters.azureDevOpsEnvironment }}"
   environment: "${{ parameters.azureDevOpsEnvironment }}"
   variables:
@@ -74,7 +80,9 @@ jobs:
             secretType: 'generic'
             secretArguments: >
                 --from-literal=ConnectionStrings__BlogConnection="$(ConnectionStrings_BlogConnection)"
-            secretName: "cbd-${{ parameters.appEnv }}-secret"
+                --from-literal=ConnectionStrings__AccountConnection="$(ConnectionStrings_AccountConnection)"
+                --from-literal=BlogsEndpointUrl="$(BlogsEndpointUrl)"
+            secretName: "cbd-${{ parameters.appEnvShortLower }}-secret"
 
         - task: AzureCLI@2
           displayName: ACR Login
@@ -93,6 +101,7 @@ jobs:
             kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
             useClusterAdmin: true
             command: 'upgrade'
+            arguments: '--timeout 450s'
             install: true
             namespace: "$(Kubernetes.Namespace)"
             releaseName: "${{ parameters.appEnv }}-${{ parameters.serviceNameKebabCase }}"
@@ -101,4 +110,4 @@ jobs:
             chartVersion: "${{ parameters.serviceVersion }}"
             overrideValues: |
               env.name=${{ parameters.appEnv }}
-              env.shortName=${{ parameters.appEnv }}
+              env.shortName=${{ parameters.appEnvShortLower }}
