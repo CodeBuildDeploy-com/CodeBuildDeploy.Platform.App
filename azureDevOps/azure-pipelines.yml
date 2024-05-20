@@ -1,0 +1,125 @@
+trigger:
+  branches:
+    include:
+    - refs/heads/main
+    - refs/heads/release/*
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+  - name: deployDev
+    displayName: Deploy to Dev
+    type: boolean
+    default: false
+
+resources:
+  repositories:
+  - repository: self
+  - repository: platform
+    type: git
+    name: 'CodeBuildDeploy.Platform'
+
+
+variables:
+# Group variables
+- group: CodeBuildDeploy-Global
+
+- template: azureDevOps/variables-infrastructure.yml@platform
+
+- template: variables-build.yml
+  parameters:
+    deployDev: ${{ parameters.deployDev }}
+
+# Versioning
+- template: azureDevOps/variables-versioning.yml@platform
+  parameters:
+    buildTypeRelease: ${{ variables['build.type.release'] }}
+    majorVersion: 1
+    minorVersion: 0
+
+name: $[variables['Build.Number']]
+
+stages:
+- stage: Build_Umbrella
+  displayName: Build Umbrella
+  jobs:
+  - job: Init_Vars
+    displayName: Init Vars
+    steps:
+    - checkout: self
+      displayName: 'Checkout Repo'
+
+    - bash: |
+        echo "build.type.release = $(build.type.release)"
+        echo "SourceVersion = $(Build.SourceVersion)"
+        echo "SourceVersion.Short = $(Build.SourceVersion.Short)"
+        echo "Build Number = $(Build.Number)"
+        echo "Version Assembly = $(Version.Assembly)"
+        echo "Version File = $(Version.File)"
+        echo "Version Informational = $(Version.Informational)"
+        echo "Version Major = $(Version.Major)"
+        echo "Version Minor = $(Version.Minor)"
+        echo "Version Patch = $(Version.Patch)"
+      displayName: Output Version
+
+  - ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
+    - job: Tag_Version
+      displayName: Tag Version
+      dependsOn:
+        - Init_Vars
+      steps:
+      - checkout: self
+        displayName: 'Checkout Repo'
+        persistCredentials: true
+
+      - script: |
+          git tag $(Build.Number)
+          git push origin $(Build.Number)
+        workingDirectory: $(Build.SourcesDirectory)
+        displayName: Tag Version in Git
+
+- ${{ if eq(variables['deploy.dev'], 'true') }}:
+  - stage: Provision_NonProd
+    displayName: Provision NonProd Infra
+    dependsOn:
+      - Build_Umbrella
+    jobs:
+
+    - ${{ if ne(variables['build.type.release'], 'true') }}:
+      - deployment: Provision_Dyn
+        displayName: Provision NonProd Dyn Environment
+        environment: NonProd-Dyn
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - template: azureDevOps/template-terraform.yml@platform
+                parameters: 
+                  service_connection: '$(Azure.Subscription.NonProd)'
+                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform/app_env'
+                  tfstate_rg_name: $(Tf.State.NonProd.RG)
+                  tfstate_storage_account_name: $(Tf.State.NonProd.SA)
+                  tfstate_blob_name: $(Tf.State.NonProd.Blob)
+                  tfstate_file_name: 'nonprod-dyn-$(Build.SourceVersion.Short)'
+                  spoke_vars_file_name: 'dyn'
+                  additional_command_options: '-var="platform_env=nonprod" -var="app_env=dyn-$(Build.SourceVersion.Short)"'
+
+    - ${{ if eq(variables['build.type.release'], 'true') }}:
+      - deployment: Provision_Dev
+        displayName: Provision NonProd Dev Environment
+        environment: NonProd-Dev
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - template: azureDevOps/template-terraform.yml@platform
+                parameters: 
+                  service_connection: '$(Azure.Subscription.NonProd)'
+                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform/app_env'
+                  tfstate_rg_name: $(Tf.State.NonProd.RG)
+                  tfstate_storage_account_name: $(Tf.State.NonProd.SA)
+                  tfstate_blob_name: $(Tf.State.NonProd.Blob)
+                  tfstate_file_name: 'nonprod-dev'
+                  spoke_vars_file_name: 'dev'
+                  additional_command_options: '-var="platform_env=nonprod" -var="app_env=dev"'
