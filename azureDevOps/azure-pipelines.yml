@@ -138,30 +138,6 @@ stages:
                 spoke_vars_file_name: '$(Deploy.AppEnvShort)'
                 additional_command_options: '-var="platform_env=nonprod" -var="app_env=$(Deploy.AppEnv)"'
 
-    - template: app-deployment.yml
-      parameters:
-        azureDevOpsEnvironment: "${{ variables['Deploy.EnvName'] }}"
-        azureSubscription: '$(Azure.Subscription.NonProd)'
-        acrRepositoryConnect: '$(Acr.Repository.Connect)'
-        containerRegistry: '$(Acr.Repository.Name).azurecr.io'
-        platformEnv: 'nonprod'
-        appEnvShort: '$(Deploy.AppEnvShort)'
-        appEnv: '$(Deploy.AppEnv)'
-        serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
-        serviceVersion: '$(Service.Blogs.Version)'
-        
-    - template: app-deployment.yml
-      parameters:
-        azureDevOpsEnvironment: "${{ variables['Deploy.EnvName'] }}"
-        azureSubscription: '$(Azure.Subscription.NonProd)'
-        acrRepositoryConnect: '$(Acr.Repository.Connect)'
-        containerRegistry: '$(Acr.Repository.Name).azurecr.io'
-        platformEnv: 'nonprod'
-        appEnvShort: '$(Deploy.AppEnvShort)'
-        appEnv: '$(Deploy.AppEnv)'
-        serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
-        serviceVersion: '$(Service.Web.Version)'
-
   - ${{ if eq(variables['deploy.prod'], 'true') }}:
     - stage: DeployProd
       displayName: Deploy Prod-Live
