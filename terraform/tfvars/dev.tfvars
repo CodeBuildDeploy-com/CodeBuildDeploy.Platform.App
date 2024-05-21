@@ -1,0 +1,5 @@
+platform_env                = "nonprod"
+app_env                     = "dev"
+default_location            = "uksouth"
+container_registry          = "codebuilddeploy.azurecr.io"
+container_registry_username = "codebuilddeploy"
