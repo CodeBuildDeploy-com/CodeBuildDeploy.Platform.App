@@ -132,7 +132,7 @@ stages:
             - template: azureDevOps/template-terraform.yml@platform
               parameters: 
                 service_connection: '$(Azure.Subscription.NonProd)'
-                terraform_work_directory: '$(Build.SourcesDirectory)/terraform/app_env'
+                terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
                 tfstate_rg_name: $(Tf.State.NonProd.RG)
                 tfstate_storage_account_name: $(Tf.State.NonProd.SA)
                 tfstate_blob_name: $(Tf.State.NonProd.Blob)

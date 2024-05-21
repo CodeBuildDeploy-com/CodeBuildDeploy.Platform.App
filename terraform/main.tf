@@ -12,3 +12,9 @@ module "cbd_app_sql_database" {
   app_env      = var.app_env
 }
 
+module "cbd_app_aks_cluster_configure" {
+  source = "./modules/aks_cluster_configure"
+ 
+  platform_env = var.platform_env
+  app_env      = var.app_env
+}
