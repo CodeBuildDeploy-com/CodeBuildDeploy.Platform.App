@@ -1,0 +1,31 @@
+variable "product" {
+  type        = string
+  description = "This variable defines the Product"
+  default     = "CodeBuildDeploy"
+}
+
+variable "default_location" {
+  type        = string
+  description = "Azure Region where resources will default to be provisioned to"
+  default     = "uksouth"
+}
+
+variable "platform_env" {
+  type        = string
+  description = "This variable defines the overarching environment, including common infrastructure"
+}
+
+variable "app_env" {
+  type        = string
+  description = "This variable defines the app environment spoke, nested apps of the platform environment"
+}
+
+variable "container_registry" {
+  type        = string
+  description = "The name of the container registry e.g. codebuilddeploy.azurecr.io"
+}
+
+variable "container_registry_username" {
+  type        = string
+  description = "The name of the user to access the container registry"
+}
