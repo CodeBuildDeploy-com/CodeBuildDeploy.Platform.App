@@ -22,39 +22,6 @@ steps:
 - checkout: none
 
 - task: Kubernetes@1
-  displayName: Create K8s Namespace
-  inputs:
-    connectionType: 'Azure Resource Manager'
-    azureSubscriptionEndpoint: "${{ parameters.azureSubscription }}"
-    azureResourceGroup: "cbd-${{ parameters.platformEnv }}-rg"
-    kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
-    useClusterAdmin: true
-    command: 'apply'
-    useConfigurationFile: true
-    configurationType: 'inline'
-    inline: |
-      apiVersion: v1
-      kind: Namespace
-      metadata:
-        name: ${{ parameters.kubernetesNamespace }}
-    secretType: 'dockerRegistry'
-    containerRegistryType: 'Azure Container Registry'
-
-- task: KubernetesManifest@1
-  displayName: Create Docker Secret to pull images from ACR
-  inputs:
-    connectionType: azureResourceManager
-    azureSubscriptionConnection: "${{ parameters.azureSubscription }}"
-    azureResourceGroup: "cbd-${{ parameters.platformEnv }}-rg"
-    kubernetesCluster: "cbd-${{ parameters.platformEnv }}-aks-cluster"
-    useClusterAdmin: true
-    action: createSecret
-    secretType: dockerRegistry
-    secretName: "cbd-pull-secret"
-    dockerRegistryEndpoint: "${{ parameters.acrRepositoryConnect }}"
-    namespace: "${{ parameters.kubernetesNamespace }}"
-
-- task: Kubernetes@1
   displayName: Create K8s secrets
   inputs:
     connectionType: 'Azure Resource Manager'

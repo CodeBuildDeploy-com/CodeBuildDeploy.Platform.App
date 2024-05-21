@@ -19,3 +19,19 @@ variable "app_env" {
   type        = string
   description = "This variable defines the app environment spoke, nested apps of the platform environment"
 }
+
+variable "container_registry" {
+  type        = string
+  description = "The name of the container registry e.g. codebuilddeploy.azurecr.io"
+}
+
+variable "container_registry_username" {
+  type        = string
+  description = "The name of the user to access the container registry"
+}
+
+variable "container_registry_email" {
+  type        = string
+  description = "The email of the user to access the container registry"
+  default     = "ServicePrincipal@AzureRM"
+}
