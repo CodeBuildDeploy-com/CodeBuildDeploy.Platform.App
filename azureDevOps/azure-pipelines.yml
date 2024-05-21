@@ -129,6 +129,8 @@ stages:
         runOnce:
           deploy:
             steps:
+            - task: KubeloginInstaller@0
+            
             - template: azureDevOps/template-terraform.yml@platform
               parameters: 
                 service_connection: '$(Azure.Subscription.NonProd)'
