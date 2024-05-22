@@ -12,6 +12,16 @@ data "azurerm_key_vault_secret" "cbd_global_acr_access_key" {
   key_vault_id = data.azurerm_key_vault.cbd_global_kv.id
 }
 
+data "azurerm_key_vault_secret" "cbd_plat_tls_cert" {
+  name         = "cbd-${var.platform_env}-tls-cert"
+  key_vault_id = data.azurerm_key_vault.cbd_global_kv.id
+}
+
+data "azurerm_key_vault_secret" "cbd_plat_tls_key" {
+  name         = "cbd-${var.platform_env}-tls-key"
+  key_vault_id = data.azurerm_key_vault.cbd_global_kv.id
+}
+
 data "azurerm_resource_group" "cbd_plat_rg" {
   name     = "cbd-${var.platform_env}-rg"
 }
