@@ -26,6 +26,21 @@ resource "kubernetes_secret" "cbd_app_kubernetes_pull_secret" {
   }
 }
 
+#https://kubernetes.io/docs/concepts/configuration/secret
+resource "kubernetes_secret" "cbd_app_secret_ssl_cert" {
+  metadata {
+    name      = "cbd-${var.app_env}-ssl-cert"
+    namespace = "cbd-${var.platform_env}-${var.app_env}"
+  }
+
+  type = "kubernetes.io/tls"
+
+  data = {
+    "tls.crt" = data.azurerm_key_vault_secret.cbd_plat_tls_cert.value
+    "tls.key" = data.azurerm_key_vault_secret.cbd_plat_tls_key.value
+  }
+}
+
 resource "kubernetes_secret" "cbd_app_kubernetes_secret" {
   metadata {
     name      = "cbd-${var.app_env}-secret"
