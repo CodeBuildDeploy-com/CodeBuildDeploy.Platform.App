@@ -6,5 +6,5 @@ resource "azurerm_mssql_database" "cbd_app_sql_database" {
   sku_name       = "Basic"
   max_size_gb    = 2
 
-  tags = local.tags
+  tags           = local.tags
 }
