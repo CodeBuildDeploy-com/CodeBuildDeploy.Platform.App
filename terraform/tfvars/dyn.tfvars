@@ -1,3 +1,4 @@
+subscription_short_name     = "enterprise"
 platform_env                = "nonprod"
 app_env                     = "dyn-shortsha"
 default_location            = "uksouth"
