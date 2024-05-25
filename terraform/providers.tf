@@ -46,18 +46,18 @@ data "azuread_service_principal" "current" {
   object_id = data.azurerm_client_config.current.object_id
 }
 
-data "azurerm_resource_group" "cbd_global_rg" {
-  name     = "cbd-global-rg"
+data "azurerm_resource_group" "cbd_subscription_rg" {
+  name = "cbd-${var.subscription_short_name}-rg"
 }
 
-data "azurerm_key_vault" "cbd_global_kv" {
-  name                = "cbd-global-kv1"
-  resource_group_name = data.azurerm_resource_group.cbd_global_rg.name
+data "azurerm_key_vault" "cbd_subscription_kv" {
+  name                = "cbd-${var.subscription_short_name}-kv"
+  resource_group_name = data.azurerm_resource_group.cbd_subscription_rg.name
 }
 
 data "azurerm_key_vault_secret" "cbd_global_terraform_user_secret" {
   name         = "cbd-global-terraform-user-client-secret"
-  key_vault_id = data.azurerm_key_vault.cbd_global_kv.id
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 
 data "azurerm_resource_group" "cbd_plat_rg" {

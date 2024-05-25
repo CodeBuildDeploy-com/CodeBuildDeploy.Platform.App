@@ -48,12 +48,12 @@ variables:
 - name: Service.Blogs.NameKebabCase
   value: 'codebuilddeploy-blogs'
 - name: Service.Blogs.Version
-  value: 1.1.70
+  value: 1.1.71
 
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy'
 - name: Service.Web.Version
-  value: 1.1.21
+  value: 1.1.23
 
 name: $[variables['Build.Number']]
 
@@ -122,7 +122,7 @@ stages:
         value: dev
     jobs:
 
-    - deployment: Provision
+    - deployment: ProvisionDev
       displayName: Provision ${{ variables['Deploy.AppEnvShortCap'] }} Environment
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       strategy:
@@ -131,11 +131,11 @@ stages:
             steps:
             - template: azureDevOps/template-terraform.yml@platform
               parameters: 
-                service_connection: '$(Azure.Subscription.NonProd)'
+                service_connection: '$(Azure.Subscription.NonProdEnterprise)'
                 terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
-                tfstate_rg_name: $(Tf.State.NonProd.RG)
-                tfstate_storage_account_name: $(Tf.State.NonProd.SA)
-                tfstate_blob_name: $(Tf.State.NonProd.Blob)
+                tfstate_rg_name: $(Tf.State.NonProdEnterprise.RG)
+                tfstate_storage_account_name: $(Tf.State.NonProdEnterprise.SA)
+                tfstate_blob_name: $(Tf.State.NonProdEnterprise.Blob)
                 tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
                 spoke_vars_file_name: '$(Deploy.AppEnvShort)'
                 additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
@@ -144,14 +144,14 @@ stages:
       displayName: "Deploy Blogs to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       dependsOn:
-      - Provision
+      - ProvisionDev
       strategy:
         runOnce:
           deploy:
             steps:
             - template: app-deployment.yml
               parameters:
-                azureSubscription: '$(Azure.Subscription.NonProd)'
+                azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
                 acrRepositoryConnect: '$(Acr.Repository.Connect)'
                 containerRegistry: '$(Acr.Repository.Name).azurecr.io'
                 platformEnv: '$(Deploy.PlatformEnv)'
@@ -165,14 +165,14 @@ stages:
       displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       dependsOn:
-      - Provision
+      - ProvisionDev
       strategy:
         runOnce:
           deploy:
             steps:
             - template: app-deployment.yml
               parameters:
-                azureSubscription: '$(Azure.Subscription.NonProd)'
+                azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
                 acrRepositoryConnect: '$(Acr.Repository.Connect)'
                 containerRegistry: '$(Acr.Repository.Name).azurecr.io'
                 platformEnv: '$(Deploy.PlatformEnv)'
@@ -183,32 +183,77 @@ stages:
                 serviceVersion: '$(Service.Web.Version)'
 
   - ${{ if eq(variables['deploy.prod'], 'true') }}:
-    - stage: DeployProd
-      displayName: Deploy Prod-Live
+    - stage: DeployLive
+      displayName: Deploy Prod Live Platform
       dependsOn:
       - DeployDev
+      variables:
+      - name: Deploy.PlatformEnv
+        value: prod
+      - name: Deploy.AppEnvShortCap
+        value: Live
+      - name: Deploy.AppEnvShort
+        value: live
+      - name: Deploy.AppEnv
+        value: live
       jobs:
-      - deployment: DeployProd
-        displayName: Deploy Containers to Prod ContainerApps
-        environment: Prod-Live
+
+      - deployment: ProvisionLive
+        displayName: Provision ${{ variables['Deploy.AppEnvShortCap'] }} Environment
+        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
         strategy:
           runOnce:
             deploy:
               steps:
-              - task: AzureContainerApps@1
-                displayName: 'Azure Container App Deploy: codebuilddeploy'
-                inputs:
-                  azureSubscription: '$(Azure.Subscription.Prod)'
-                  containerAppName: '$(Service.Blogs.NameKebabCase)'
-                  resourceGroup: 'codebuilddeploy-rg'
-                  imageToDeploy: '$(Acr.Repository.Name).azurecr.io/$(Service.Blogs.NameKebabCase):$(Service.Blogs.Version)'
-                  targetPort: '8080'
+              - template: azureDevOps/template-terraform.yml@platform
+                parameters: 
+                  service_connection: '$(Azure.Subscription.ProdPremium)'
+                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
+                  tfstate_rg_name: $(Tf.State.ProdPremium.RG)
+                  tfstate_storage_account_name: $(Tf.State.ProdPremium.SA)
+                  tfstate_blob_name: $(Tf.State.ProdPremium.Blob)
+                  tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
+                  spoke_vars_file_name: '$(Deploy.AppEnvShort)'
+                  additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
 
-              - task: AzureContainerApps@1
-                displayName: 'Azure Container App Deploy: codebuilddeploy'
-                inputs:
-                  azureSubscription: '$(Azure.Subscription.Prod)'
-                  containerAppName: '$(Service.Web.NameKebabCase)'
-                  resourceGroup: 'codebuilddeploy-rg'
-                  imageToDeploy: '$(Acr.Repository.Name).azurecr.io/$(Service.Web.NameKebabCase):$(Service.Web.Version)'
-                  targetPort: '8080'
+      - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Blogs"
+        displayName: "Deploy Blogs to Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+        dependsOn:
+        - ProvisionLive
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - template: app-deployment.yml
+                parameters:
+                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
+                  acrRepositoryConnect: '$(Acr.Repository.Connect)'
+                  containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                  platformEnv: '$(Deploy.PlatformEnv)'
+                  appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
+                  appEnv: '$(Deploy.AppEnv)'
+                  kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
+                  serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
+                  serviceVersion: '$(Service.Blogs.Version)'
+          
+      - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
+        displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+        dependsOn:
+        - ProvisionLive
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - template: app-deployment.yml
+                parameters:
+                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
+                  acrRepositoryConnect: '$(Acr.Repository.Connect)'
+                  containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                  platformEnv: '$(Deploy.PlatformEnv)'
+                  appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
+                  appEnv: '$(Deploy.AppEnv)'
+                  kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
+                  serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
+                  serviceVersion: '$(Service.Web.Version)'

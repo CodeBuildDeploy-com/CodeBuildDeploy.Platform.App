@@ -10,6 +10,11 @@ variable "default_location" {
   default     = "uksouth"
 }
 
+variable "subscription_short_name" {
+  type        = string
+  description = "This variable is a short name version of the subscription being used for the platform"
+}
+
 variable "platform_env" {
   type        = string
   description = "This variable defines the overarching environment, including common infrastructure"
