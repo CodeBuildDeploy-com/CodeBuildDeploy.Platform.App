@@ -12,6 +12,26 @@ data "azurerm_key_vault_secret" "cbd_global_acr_access_key" {
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 
+data "azurerm_key_vault_secret" "cbd_global_google_client_id" {
+  name         = "cbd-global-google-client-id"
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
+}
+
+data "azurerm_key_vault_secret" "cbd_global_google_client_secret" {
+  name         = "cbd-global-google-client-secret"
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
+}
+
+data "azurerm_key_vault_secret" "cbd_global_microsft_client_id" {
+  name         = "cbd-global-microsft-client-id"
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
+}
+
+data "azurerm_key_vault_secret" "cbd_global_microsft_client_secret" {
+  name         = "cbd-global-microsft-client-secret"
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
+}
+
 data "azurerm_key_vault_secret" "cbd_plat_tls_cert" {
   name         = "cbd-${var.platform_env}-tls-cert"
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
