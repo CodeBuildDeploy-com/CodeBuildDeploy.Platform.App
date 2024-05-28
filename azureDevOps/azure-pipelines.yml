@@ -48,12 +48,17 @@ variables:
 - name: Service.Blogs.NameKebabCase
   value: 'codebuilddeploy-blogs'
 - name: Service.Blogs.Version
-  value: 1.1.71
+  value: 1.1.72
+
+- name: Service.Identity.NameKebabCase
+  value: 'codebuilddeploy-identity'
+- name: Service.Identity.Version
+  value: 1.0.2
 
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
 - name: Service.Web.Version
-  value: 1.1.26
+  value: 1.1.27
 
 name: $[variables['Build.Number']]
 
@@ -79,6 +84,8 @@ stages:
         echo "Version Minor = $(Version.Minor)"
         echo "Version Patch = $(Version.Patch)"
         echo "Blogs Service Version = $(Service.Blogs.Version)"
+        echo "Identity Service Version = $(Service.Identity.Version)"
+        echo "Web Service Version = $(Service.Web.Version)"
       displayName: Output Version
 
   - ${{ if ne(variables['Build.Reason'], 'PullRequest') }}:
@@ -160,6 +167,27 @@ stages:
                 kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
                 serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
                 serviceVersion: '$(Service.Blogs.Version)'
+
+    - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Identity"
+      displayName: "Deploy Identity to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+      dependsOn:
+      - ProvisionDev
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - template: app-deployment.yml
+              parameters:
+                azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
+                acrRepositoryConnect: '$(Acr.Repository.Connect)'
+                containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                platformEnv: '$(Deploy.PlatformEnv)'
+                appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
+                appEnv: '$(Deploy.AppEnv)'
+                kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
+                serviceNameKebabCase: '$(Service.Identity.NameKebabCase)'
+                serviceVersion: '$(Service.Identity.Version)'
         
     - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
       displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
@@ -236,6 +264,27 @@ stages:
                   kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
                   serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
                   serviceVersion: '$(Service.Blogs.Version)'
+
+      - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Identity"
+        displayName: "Deploy Identity to Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+        dependsOn:
+        - ProvisionLive
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - template: app-deployment.yml
+                parameters:
+                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
+                  acrRepositoryConnect: '$(Acr.Repository.Connect)'
+                  containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                  platformEnv: '$(Deploy.PlatformEnv)'
+                  appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
+                  appEnv: '$(Deploy.AppEnv)'
+                  kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
+                  serviceNameKebabCase: '$(Service.Identity.NameKebabCase)'
+                  serviceVersion: '$(Service.Identity.Version)'
           
       - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
         displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
