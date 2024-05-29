@@ -53,7 +53,7 @@ variables:
 - name: Service.Identity.NameKebabCase
   value: 'codebuilddeploy-identity'
 - name: Service.Identity.Version
-  value: 1.0.3
+  value: 1.0.4
 
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
