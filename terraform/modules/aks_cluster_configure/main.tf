@@ -54,10 +54,23 @@ resource "kubernetes_secret" "cbd_app_kubernetes_secret" {
     "ConnectionStrings__BlogConnection" = "Server=tcp:cbd-${var.platform_env}-sql-server.database.windows.net,1433;Initial Catalog=cbd-${var.platform_env}-${var.app_env}-sql-database;Persist Security Info=False;User ID=cbd-sql-admin-${var.platform_env};Password='${sensitive(data.azurerm_key_vault_secret.cbd_plat_sql_server_admin_password.value)}';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
     "ConnectionStrings__AccountMigrationConnection" = "Server=tcp:cbd-${var.platform_env}-sql-server.database.windows.net,1433;Initial Catalog=cbd-${var.platform_env}-${var.app_env}-sql-database;Persist Security Info=False;User ID=cbd-sql-admin-${var.platform_env};Password='${sensitive(data.azurerm_key_vault_secret.cbd_plat_sql_server_admin_password.value)}';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
     "ConnectionStrings__AccountConnection" = "Server=tcp:cbd-${var.platform_env}-sql-server.database.windows.net,1433;Initial Catalog=cbd-${var.platform_env}-${var.app_env}-sql-database;Persist Security Info=False;User ID=cbd-sql-admin-${var.platform_env};Password='${sensitive(data.azurerm_key_vault_secret.cbd_plat_sql_server_admin_password.value)}';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
+    "Authentication__DataProtection__AzureStorage__ConnectionString" = data.azurerm_storage_account.cbd_app_sa.primary_connection_string
     "Authentication__Google__ClientId" = data.azurerm_key_vault_secret.cbd_app_google_client_id.value
     "Authentication__Google__ClientSecret" = data.azurerm_key_vault_secret.cbd_app_google_client_secret.value
     "Authentication__Microsoft__ClientId" = data.azurerm_key_vault_secret.cbd_app_microsoft_client_id.value
     "Authentication__Microsoft__ClientSecret" = data.azurerm_key_vault_secret.cbd_app_microsoft_client_secret.value
     "BlogsEndpointUrl" = "https://${var.app_env}.codebuilddeploy.co.uk"
+  }
+}
+
+resource "kubernetes_config_map" "cbd_app_kubernetes_config_map" {
+  metadata {
+    name      = "cbd-${var.app_env}-configmap"
+    namespace = "cbd-${var.platform_env}-${var.app_env}"
+  }
+
+  data = {
+    "Authentication__DataProtection__AzureStorage__ContainerName" = "cbd-${var.platform_env}-${var.app_env}-sc"
+    "Authentication__DataProtection__AzureStorage__BlobName" = "DataProtectionKey"
   }
 }
