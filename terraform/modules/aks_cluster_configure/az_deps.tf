@@ -43,7 +43,7 @@ data "azurerm_key_vault_secret" "cbd_plat_tls_key" {
 }
 
 data "azurerm_resource_group" "cbd_plat_rg" {
-  name     = "cbd-${var.platform_env}-rg"
+  name = "cbd-${var.platform_env}-rg"
 }
 
 data "azurerm_key_vault" "cbd_plat_kv" {
@@ -59,4 +59,13 @@ data "azurerm_key_vault_secret" "cbd_plat_sql_server_admin_password" {
 data "azurerm_kubernetes_cluster" "cbd_plat_aks_cluster" {
   name                = "cbd-${var.platform_env}-aks-cluster"
   resource_group_name = data.azurerm_resource_group.cbd_plat_rg.name
+}
+
+data "azurerm_resource_group" "cbd_app_rg" {
+  name = "cbd-${var.platform_env}-${var.app_env}-rg"
+}
+
+data "azurerm_storage_account" "cbd_app_sa" {
+  name                = "cbd${var.platform_env}${var.app_env}sa"
+  resource_group_name = azurerm_resource_group.cbd_app_rg.name
 }
