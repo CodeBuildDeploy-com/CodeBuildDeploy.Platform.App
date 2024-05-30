@@ -15,7 +15,8 @@ module "cbd_app_sql_database" {
 }
 
 module "cbd_app_aks_cluster_configure" {
-  source = "./modules/aks_cluster_configure"
+  depends_on = [module.cbd_app_core_resources]
+  source     = "./modules/aks_cluster_configure"
  
   subscription_short_name     = var.subscription_short_name
   platform_env                = var.platform_env
