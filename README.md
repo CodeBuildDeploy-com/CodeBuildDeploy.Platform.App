@@ -1,5 +1,5 @@
 # Introduction 
-Repository for provissioning the CodeBuildDeploy App platform in Azure
+Repository for provisioning the CodeBuildDeploy App platform in Azure
 
 # azureDevOps
 This folder contains the Azure DevOps (ADO) pipelines
