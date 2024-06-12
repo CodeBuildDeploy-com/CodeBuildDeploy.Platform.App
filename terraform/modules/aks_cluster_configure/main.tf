@@ -60,6 +60,7 @@ resource "kubernetes_secret" "cbd_app_kubernetes_secret" {
     "Authentication__Microsoft__ClientId" = data.azurerm_key_vault_secret.cbd_app_microsoft_client_id.value
     "Authentication__Microsoft__ClientSecret" = data.azurerm_key_vault_secret.cbd_app_microsoft_client_secret.value
     "BlogsEndpointUrl" = "https://${var.app_env}.codebuilddeploy.co.uk"
+    "EmailSettings__ConnectionString" = data.azurerm_key_vault_secret.cbd_global_comm_services_connection_string.value
   }
 }
 
@@ -72,5 +73,6 @@ resource "kubernetes_config_map" "cbd_app_kubernetes_config_map" {
   data = {
     "Authentication__DataProtection__AzureStorage__ContainerName" = "cbd-${var.platform_env}-${var.app_env}-sc"
     "Authentication__DataProtection__AzureStorage__BlobName" = "DataProtectionKey"
+    "EmailSettings__SenderAddress" = "DoNotReply@codebuilddeploy.com"
   }
 }

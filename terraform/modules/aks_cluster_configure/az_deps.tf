@@ -12,6 +12,11 @@ data "azurerm_key_vault_secret" "cbd_global_acr_access_key" {
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 
+data "azurerm_key_vault_secret" "cbd_global_comm_services_connection_string" {
+  name         = "cbd-global-comm-services-connection-string"
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
+}
+
 data "azurerm_key_vault_secret" "cbd_app_google_client_id" {
   name         = "cbd-${var.platform_env}-${var.app_env}-google-client-id"
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
