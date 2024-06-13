@@ -1,4 +1,4 @@
-subscription_short_name     = "premium"
+subscription_friendly_name  = "premium"
 platform_env                = "prod"
 app_env                     = "live"
 default_location            = "uksouth"

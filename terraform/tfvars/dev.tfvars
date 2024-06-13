@@ -1,4 +1,4 @@
-subscription_short_name     = "enterprise"
+subscription_friendly_name  = "enterprise"
 platform_env                = "nonprod"
 app_env                     = "dev"
 default_location            = "uksouth"
