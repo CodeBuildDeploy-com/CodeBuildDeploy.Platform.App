@@ -59,7 +59,7 @@ variables:
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
 - name: Service.Web.Version
-  value: 1.1.62
+  value: 1.1.63
 
 name: $[variables['Build.Number']]
 
