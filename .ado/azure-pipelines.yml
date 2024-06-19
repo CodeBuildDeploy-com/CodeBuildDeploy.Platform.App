@@ -49,7 +49,7 @@ variables:
 - name: Service.Blogs.NameKebabCase
   value: 'codebuilddeploy-blogs'
 - name: Service.Blogs.Version
-  value: 1.1.87
+  value: 1.1.88
 
 - name: Service.Identity.NameKebabCase
   value: 'codebuilddeploy-identity'
@@ -59,7 +59,7 @@ variables:
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
 - name: Service.Web.Version
-  value: 1.1.73
+  value: 1.1.76
 
 name: $[variables['Build.Number']]
 
