@@ -55,6 +55,7 @@ resource "kubernetes_secret" "cbd_app_kubernetes_secret" {
     "ConnectionStrings__AccountMigrationConnection" = "Server=tcp:cbd-${var.platform_env}-sql-server.database.windows.net,1433;Initial Catalog=cbd-${var.platform_env}-${var.app_env}-sql-database;Persist Security Info=False;User ID=cbd-sql-admin-${var.platform_env};Password='${sensitive(data.azurerm_key_vault_secret.cbd_plat_sql_server_admin_password.value)}';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
     "ConnectionStrings__AccountConnection" = "Server=tcp:cbd-${var.platform_env}-sql-server.database.windows.net,1433;Initial Catalog=cbd-${var.platform_env}-${var.app_env}-sql-database;Persist Security Info=False;User ID=cbd-sql-admin-${var.platform_env};Password='${sensitive(data.azurerm_key_vault_secret.cbd_plat_sql_server_admin_password.value)}';MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
     "Authentication__DataProtection__AzureStorage__ConnectionString" = data.azurerm_storage_account.cbd_app_sa.primary_connection_string
+    "Authentication__Jwt__PrivateKey" = data.azurerm_key_vault_secret.cbd_app_jwt_private_key.value
     "Authentication__Google__ClientId" = data.azurerm_key_vault_secret.cbd_app_google_client_id.value
     "Authentication__Google__ClientSecret" = data.azurerm_key_vault_secret.cbd_app_google_client_secret.value
     "Authentication__Microsoft__ClientId" = data.azurerm_key_vault_secret.cbd_app_microsoft_client_id.value
