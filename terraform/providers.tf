@@ -5,22 +5,22 @@ terraform {
     #https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~>3.101.0"
+      version = "~>4.31.0"
     }
     #https://registry.terraform.io/providers/hashicorp/azuread/latest/docs
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~> 2.50.0"
+      version = "~>3.4.0"
     }
     #https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~>2.30.0"
+      version = "~>2.37.1"
     }
     #https://registry.terraform.io/providers/hashicorp/helm/latest/docs
     helm = {
       source  = "hashicorp/helm"
-      version = "~>2.13.2"
+      version = "~>2.17.0"
     }
   }
 
