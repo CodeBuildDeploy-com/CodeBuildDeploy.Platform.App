@@ -87,7 +87,6 @@ provider "kubernetes" {
       "AzurePublicCloud",
       "--server-id",
       "6dae42f8-4368-4678-94ff-3960e28e3630",
-      #yamldecode(data.azurerm_kubernetes_cluster.cbd_plat_aks_cluster.kube_config_raw)["users"][0]["user"]["exec"]["args"][4],
       "--login",
       "spn",
       "--tenant-id",
@@ -95,7 +94,7 @@ provider "kubernetes" {
       "--client-id",
       data.azuread_service_principal.current.client_id,
       "--client-certificate",
-      base64decode(data.azurerm_key_vault_secret.cbd_global_terraform_user_certificate.value),
+      "${path.cwd}/terraform-cert.pem"
     ]
   }
 }
@@ -121,7 +120,7 @@ provider "helm" {
         "--client-id",
         data.azuread_service_principal.current.client_id,
         "--client-certificate",
-        base64decode(data.azurerm_key_vault_secret.cbd_global_terraform_user_certificate.value),
+        "${path.cwd}/terraform-cert.pem"
       ]
     }
   }
