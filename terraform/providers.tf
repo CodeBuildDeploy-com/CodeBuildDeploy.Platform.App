@@ -60,6 +60,11 @@ data "azurerm_key_vault_secret" "cbd_global_terraform_user_secret" {
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 
+data "azurerm_key_vault_secret" "cbd_global_terraform_user_certificate" {
+  name         = "cbd-global-terraform-user-client-certificate"
+  key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
+}
+
 data "azurerm_resource_group" "cbd_plat_rg" {
   name     = "cbd-${var.platform_env}-rg"
 }
@@ -89,8 +94,8 @@ provider "kubernetes" {
       data.azurerm_client_config.current.tenant_id,
       "--client-id",
       data.azuread_service_principal.current.client_id,
-      "--client-secret",
-      data.azurerm_key_vault_secret.cbd_global_terraform_user_secret.value,
+      "--client-certificate",
+        base64decode(data.azurerm_key_vault_secret.cbd_global_terraform_user_certificate.value),
     ]
   }
 }
@@ -115,8 +120,8 @@ provider "helm" {
         data.azurerm_client_config.current.tenant_id,
         "--client-id",
         data.azuread_service_principal.current.client_id,
-        "--client-secret",
-        data.azurerm_key_vault_secret.cbd_global_terraform_user_secret.value,
+        "--client-certificate",
+        base64decode(data.azurerm_key_vault_secret.cbd_global_terraform_user_certificate.value),
       ]
     }
   }
