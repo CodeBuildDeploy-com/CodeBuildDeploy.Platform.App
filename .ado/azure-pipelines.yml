@@ -25,6 +25,10 @@ resources:
     type: github
     endpoint: 'CodeBuildDeploy-com'
     name: 'CodeBuildDeploy-com/CodeBuildDeploy.Platform.Subscription'
+  - repository: envplatform
+    type: github
+    endpoint: 'CodeBuildDeploy-com'
+    name: 'CodeBuildDeploy-com/CodeBuildDeploy.Platform.Environment'
 
 variables:
 - group: CodeBuildDeploy-Global
@@ -137,6 +141,10 @@ stages:
         runOnce:
           deploy:
             steps:
+            - template: .ado/template-terraform-kube-prepare.yml@senvplatform
+              parameters: 
+                service_connection: '$(Azure.Subscription.NonProdEnterprise)'
+                terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
             - template: .ado/template-terraform.yml@subplatform
               parameters: 
                 service_connection: '$(Azure.Subscription.NonProdEnterprise)'
@@ -234,6 +242,10 @@ stages:
           runOnce:
             deploy:
               steps:
+              - template: .ado/template-terraform-kube-prepare.yml@senvplatform
+                parameters: 
+                  service_connection: '$(Azure.Subscription.ProdPremium)'
+                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
               - template: .ado/template-terraform.yml@subplatform
                 parameters: 
                   service_connection: '$(Azure.Subscription.ProdPremium)'
