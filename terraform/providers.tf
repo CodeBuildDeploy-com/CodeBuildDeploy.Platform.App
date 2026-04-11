@@ -5,22 +5,22 @@ terraform {
     #https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~>4.31.0"
+      version = "~>4.68.0"
     }
     #https://registry.terraform.io/providers/hashicorp/azuread/latest/docs
     azuread = {
       source  = "hashicorp/azuread"
-      version = "~>3.4.0"
+      version = "~>3.8.0"
     }
     #https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~>2.37.1"
+      version = "~> 2.38.0"
     }
     #https://registry.terraform.io/providers/hashicorp/helm/latest/docs
     helm = {
       source  = "hashicorp/helm"
-      version = "~>2.17.0"
+      version = "~> 2.17.0"
     }
   }
 
@@ -94,7 +94,7 @@ provider "kubernetes" {
       "--client-id",
       data.azuread_service_principal.current.client_id,
       "--client-certificate",
-      "${path.cwd}/terraform-cert.pem"
+      abspath("${path.cwd}/terraform-cert.pem")
     ]
   }
 }
@@ -120,7 +120,7 @@ provider "helm" {
         "--client-id",
         data.azuread_service_principal.current.client_id,
         "--client-certificate",
-        "${path.cwd}/terraform-cert.pem"
+        abspath("${path.cwd}/terraform-cert.pem")
       ]
     }
   }
