@@ -21,7 +21,7 @@ parameters:
 steps:
 - checkout: none
 
-- task: AzureCLI@2
+- task: AzureCLI@3
   displayName: ACR Login
   inputs:
     azureSubscription: "${{ parameters.azureSubscription }}"
@@ -30,7 +30,7 @@ steps:
     inlineScript: |
       az acr login --name ${{ parameters.containerRegistry }}
 
-- task: HelmDeploy@0
+- task: HelmDeploy@1
   inputs:
     connectionType: 'Azure Resource Manager'
     azureSubscription: "${{ parameters.azureSubscription }}"
