@@ -1,36 +1,38 @@
+{{- $env := required "env.name is required" .Values.env.name }}
+{{- $hostPrefix := ternary "www" $env (eq $env "live") }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: codebuilddeploy-dev
+  name: codebuilddeploy-{{ $env }}
 spec:
   gatewayClassName: istio
   infrastructure:
     annotations:
-      service.beta.kubernetes.io/azure-allowed-ip-ranges: "87.192.98.248/32"
+      service.beta.kubernetes.io/azure-allowed-ip-ranges: {{ required "originAllowedIpRanges is required" .Values.originAllowedIpRanges | quote }}
       service.beta.kubernetes.io/port_443_health-probe_protocol: "Http"
       service.beta.kubernetes.io/port_443_health-probe_port: "status-port"
       service.beta.kubernetes.io/port_443_health-probe_request-path: "/healthz/ready"
       service.beta.kubernetes.io/port_15021_no_lb_rule: "true"
   listeners:
     - name: https-uk
-      hostname: dev.codebuilddeploy.co.uk
+      hostname: {{ printf "%s.codebuilddeploy.co.uk" $hostPrefix | quote }}
       port: 443
       protocol: HTTPS
       tls:
         mode: Terminate
         certificateRefs:
-          - name: cbd-dev-ssl-cert
+          - name: cbd-{{ $env }}-ssl-cert
       allowedRoutes:
         namespaces:
           from: Same
     - name: https-com
-      hostname: dev.codebuilddeploy.com
+      hostname: {{ printf "%s.codebuilddeploy.com" $hostPrefix | quote }}
       port: 443
       protocol: HTTPS
       tls:
         mode: Terminate
         certificateRefs:
-          - name: cbd-dev-ssl-cert
+          - name: cbd-{{ $env }}-ssl-cert
       allowedRoutes:
         namespaces:
           from: Same

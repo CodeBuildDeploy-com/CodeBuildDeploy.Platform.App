@@ -5,7 +5,7 @@ resource "azurerm_resource_group" "cbd_app_rg" {
 }
 
 resource "azurerm_storage_account" "cbd_app_sa" {
-  name                     = "cbd${var.platform_env}${var.app_env}sa"
+  name                     = "cbd${var.platform_env}${replace(var.app_env, "-", "")}sa"
   resource_group_name      = azurerm_resource_group.cbd_app_rg.name
   location                 = azurerm_resource_group.cbd_app_rg.location
   account_tier             = "Standard"

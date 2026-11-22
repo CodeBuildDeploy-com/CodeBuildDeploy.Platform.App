@@ -76,6 +76,6 @@ data "azurerm_resource_group" "cbd_app_rg" {
 }
 
 data "azurerm_storage_account" "cbd_app_sa" {
-  name                = "cbd${var.platform_env}${var.app_env}sa"
+  name                = "cbd${var.platform_env}${replace(var.app_env, "-", "")}sa"
   resource_group_name = data.azurerm_resource_group.cbd_app_rg.name
 }

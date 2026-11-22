@@ -151,131 +151,15 @@ stages:
                 spoke_vars_file_name: '$(Deploy.AppEnvShort)'
                 additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
 
-    - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Blogs"
-      displayName: "Deploy Blogs to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      dependsOn: ProvisionDev
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-            - template: app-deployment.yml
-              parameters:
-                azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                registryName: '$(Acr.Repository.Name)'
-                platformEnv: '$(Deploy.PlatformEnv)'
-                appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
-                appEnv: '$(Deploy.AppEnv)'
-                kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
-                serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
-                serviceVersion: '$(Service.Blogs.Version)'
-                ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-                  gatewayName: codebuilddeploy-dev
-
-    - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Identity"
-      displayName: "Deploy Identity to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      dependsOn:
-      - ProvisionDev
-      - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-        - Deploy_Dev_Blogs
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-            - template: app-deployment.yml
-              parameters:
-                azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                registryName: '$(Acr.Repository.Name)'
-                platformEnv: '$(Deploy.PlatformEnv)'
-                appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
-                appEnv: '$(Deploy.AppEnv)'
-                kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
-                serviceNameKebabCase: '$(Service.Identity.NameKebabCase)'
-                serviceVersion: '$(Service.Identity.Version)'
-                ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-                  gatewayName: codebuilddeploy-dev
-        
-    - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
-      displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      dependsOn:
-      - ProvisionDev
-      - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-        - Deploy_Dev_Identity
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-            - template: app-deployment.yml
-              parameters:
-                azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                registryName: '$(Acr.Repository.Name)'
-                platformEnv: '$(Deploy.PlatformEnv)'
-                appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
-                appEnv: '$(Deploy.AppEnv)'
-                kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
-                serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
-                serviceVersion: '$(Service.Web.Version)'
-                ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-                  gatewayName: codebuilddeploy-dev
-
-    - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-      - deployment: DeployDevGateway
-        displayName: Deploy shared Dev Istio gateway
-        environment: 'NonProd-Dev'
-        dependsOn:
-        - Deploy_Dev_Web
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-              - checkout: self
-              - task: AzureCLI@3
-                displayName: Verify Dev HTTPRoute handoff
-                inputs:
-                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                  scriptType: bash
-                  scriptLocation: inlineScript
-                  inlineScript: |
-                    set -euo pipefail
-                    export KUBECONFIG
-                    KUBECONFIG=$(mktemp)
-                    trap 'rm -f -- "$KUBECONFIG"' EXIT
-                    az aks get-credentials --resource-group cbd-nonprod-rg --name cbd-nonprod-aks-cluster --admin --overwrite-existing --file "$KUBECONFIG" --only-show-errors
-                    shared_route=$(kubectl -n cbd-nonprod-dev --request-timeout=15s get httproute codebuilddeploy-dev --ignore-not-found -o name)
-                    if [[ -z "$shared_route" ]]; then
-                      exit 0
-                    fi
-                    for _ in {1..12}; do
-                      if kubectl -n cbd-nonprod-dev --request-timeout=5s get httproute dev-codebuilddeploy-web dev-codebuilddeploy-blogs dev-codebuilddeploy-identity -o json |
-                        jq -e '(.items | length) == 3 and all(.items[];
-                          .metadata.generation as $generation |
-                          any(.status.parents[]?;
-                            .parentRef.name == "codebuilddeploy-dev" and
-                            ([.conditions[]? | select(.status == "True" and .observedGeneration == $generation) | .type] |
-                              contains(["Accepted", "ResolvedRefs"]))))' >/dev/null; then
-                        exit 0
-                      fi
-                      sleep 5
-                    done
-                    echo "Publish and pin all three app charts with accepted HTTPRoutes before removing the shared route." >&2
-                    exit 1
-              - task: HelmDeploy@1
-                displayName: Deploy shared Dev Istio gateway
-                inputs:
-                  connectionType: 'Azure Resource Manager'
-                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                  azureResourceGroup: 'cbd-nonprod-rg'
-                  kubernetesCluster: 'cbd-nonprod-aks-cluster'
-                  useClusterAdmin: true
-                  command: 'upgrade'
-                  arguments: '--atomic --timeout 450s'
-                  install: true
-                  namespace: 'cbd-nonprod-dev'
-                  releaseName: 'cbd-dev-istio-gateway'
-                  chartType: 'FilePath'
-                  chartPath: '$(Build.SourcesDirectory)/helm/dev-istio-gateway'
+    - template: app-release-jobs.yml
+      parameters:
+        azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
+        registryName: '$(Acr.Repository.Name)'
+        platformEnv: '$(Deploy.PlatformEnv)'
+        appEnvShort: '$(Deploy.AppEnvShort)'
+        appEnv: '$(Deploy.AppEnv)'
+        deploymentEnvironment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+        provisionJob: ProvisionDev
 
   - ${{ if eq(variables['deploy.prod'], 'true') }}:
     - stage: DeployLive
@@ -359,62 +243,12 @@ stages:
                   spoke_vars_file_name: '$(Deploy.AppEnvShort)'
                   additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
 
-      - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Blogs"
-        displayName: "Deploy Blogs to Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
-        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
-        dependsOn:
-        - ProvisionLive
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-              - template: app-deployment.yml
-                parameters:
-                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
-                  registryName: '$(Acr.Repository.ProdName)'
-                  platformEnv: '$(Deploy.PlatformEnv)'
-                  appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
-                  appEnv: '$(Deploy.AppEnv)'
-                  kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
-                  serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
-                  serviceVersion: '$(Service.Blogs.Version)'
-
-      - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Identity"
-        displayName: "Deploy Identity to Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
-        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
-        dependsOn:
-        - ProvisionLive
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-              - template: app-deployment.yml
-                parameters:
-                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
-                  registryName: '$(Acr.Repository.ProdName)'
-                  platformEnv: '$(Deploy.PlatformEnv)'
-                  appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
-                  appEnv: '$(Deploy.AppEnv)'
-                  kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
-                  serviceNameKebabCase: '$(Service.Identity.NameKebabCase)'
-                  serviceVersion: '$(Service.Identity.Version)'
-          
-      - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
-        displayName: "Deploy Web to Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
-        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
-        dependsOn:
-        - ProvisionLive
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-              - template: app-deployment.yml
-                parameters:
-                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
-                  registryName: '$(Acr.Repository.ProdName)'
-                  platformEnv: '$(Deploy.PlatformEnv)'
-                  appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
-                  appEnv: '$(Deploy.AppEnv)'
-                  kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
-                  serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
-                  serviceVersion: '$(Service.Web.Version)'
+      - template: app-release-jobs.yml
+        parameters:
+          azureSubscription: '$(Azure.Subscription.ProdPremium)'
+          registryName: '$(Acr.Repository.ProdName)'
+          platformEnv: '$(Deploy.PlatformEnv)'
+          appEnvShort: '$(Deploy.AppEnvShort)'
+          appEnv: '$(Deploy.AppEnv)'
+          deploymentEnvironment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+          provisionJob: ProvisionLive

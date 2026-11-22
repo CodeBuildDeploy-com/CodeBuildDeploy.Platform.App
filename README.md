@@ -22,6 +22,20 @@ The production connection identity needs registry lookup access and the
 same Microsoft Entra tenant. The production AKS image pull secret needs access
 to the production registry.
 
+## Istio ingress
+
+Dev, dynamic and Live deployments use the same app release jobs. Each app chart
+deploys its own `HTTPRoute`. The shared chart uses `codebuilddeploy-<app_env>` as
+the Gateway name and `cbd-<app_env>-ssl-cert` for TLS in the app namespace.
+Dev keeps `dev.codebuilddeploy.*`, Live uses `www.codebuilddeploy.*`, and dynamic
+deployments use `dyn-<shortsha>.codebuilddeploy.*`.
+
+Run Platform.Environment in the target subscription first to install Istio and
+the Gateway API. The platform TLS certificate in Key Vault must cover the target
+hostnames. Dynamic deployments can use a wildcard certificate for both domains.
+Publish the matching DNS and Nginx Proxy Manager upstreams when an environment is
+ready to receive traffic. The gateway chart allowlists the router's static WAN IP.
+
 # terraform
 This folder contains the terraform used to provission the acual environments and all its associated infrastructure.
 

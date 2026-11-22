@@ -1,0 +1,5 @@
+apiVersion: v2
+name: istio-gateway
+description: CodeBuildDeploy environment HTTPS gateway
+version: 1.0.3
+type: application

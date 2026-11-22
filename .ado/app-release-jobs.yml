@@ -1,0 +1,101 @@
+parameters:
+- name: azureSubscription
+  type: string
+- name: registryName
+  type: string
+- name: platformEnv
+  type: string
+- name: appEnvShort
+  type: string
+- name: appEnv
+  type: string
+- name: deploymentEnvironment
+  type: string
+- name: provisionJob
+  type: string
+- name: services
+  type: object
+  default:
+    - name: Blogs
+      after: ''
+    - name: Identity
+      after: DeployBlogs
+    - name: Web
+      after: DeployIdentity
+
+jobs:
+- ${{ each service in parameters.services }}:
+  - deployment: Deploy${{ service.name }}
+    displayName: Deploy ${{ service.name }} to ${{ parameters.deploymentEnvironment }}
+    environment: ${{ parameters.deploymentEnvironment }}
+    dependsOn: ${{ coalesce(service.after, parameters.provisionJob) }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - template: app-deployment.yml
+            parameters:
+              azureSubscription: ${{ parameters.azureSubscription }}
+              registryName: ${{ parameters.registryName }}
+              platformEnv: ${{ parameters.platformEnv }}
+              appEnvShort: ${{ parameters.appEnvShort }}
+              appEnv: ${{ parameters.appEnv }}
+              kubernetesNamespace: cbd-${{ parameters.platformEnv }}-${{ parameters.appEnv }}
+              serviceNameKebabCase: ${{ format('$(Service.{0}.NameKebabCase)', service.name) }}
+              serviceVersion: ${{ format('$(Service.{0}.Version)', service.name) }}
+
+- deployment: DeployGateway
+  displayName: Deploy shared Istio gateway to ${{ parameters.deploymentEnvironment }}
+  environment: ${{ parameters.deploymentEnvironment }}
+  dependsOn: DeployWeb
+  strategy:
+    runOnce:
+      deploy:
+        steps:
+        - checkout: self
+        - task: AzureCLI@3
+          displayName: Deploy Istio gateway and verify app routes
+          inputs:
+            azureSubscription: ${{ parameters.azureSubscription }}
+            scriptType: bash
+            scriptLocation: inlineScript
+            inlineScript: |
+              set -euo pipefail
+              export KUBECONFIG
+              KUBECONFIG=$(mktemp)
+              trap 'rm -f -- "$KUBECONFIG"' EXIT
+              az aks get-credentials --resource-group "cbd-$PLATFORM_ENV-rg" --name "cbd-$PLATFORM_ENV-aks-cluster" --admin --overwrite-existing --file "$KUBECONFIG" --only-show-errors
+
+              namespace="cbd-$PLATFORM_ENV-$APP_ENV"
+              gateway="codebuilddeploy-$APP_ENV"
+              routes=("$APP_ENV-codebuilddeploy-web" "$APP_ENV-codebuilddeploy-blogs" "$APP_ENV-codebuilddeploy-identity")
+
+              wait_for_app_routes() {
+                for _ in {1..12}; do
+                  if kubectl -n "$namespace" --request-timeout=5s get httproute "${routes[@]}" -o json |
+                    jq -e --arg gateway "$gateway" '(.items | length) == 3 and all(.items[];
+                      .metadata.generation as $generation |
+                      any(.status.parents[]?;
+                        .parentRef.name == $gateway and
+                        ([.conditions[]? | select(.status == "True" and .observedGeneration == $generation) | .type] |
+                          contains(["Accepted", "ResolvedRefs"]))))' >/dev/null; then
+                    return 0
+                  fi
+                  sleep 5
+                done
+                echo "All three app HTTPRoutes must be accepted by $gateway." >&2
+                return 1
+              }
+
+              shared_route=$(kubectl -n "$namespace" --request-timeout=15s get httproute "$gateway" --ignore-not-found -o name)
+              if [[ -n "$shared_route" ]]; then
+                wait_for_app_routes
+              fi
+
+              helm upgrade --install "cbd-$APP_ENV-istio-gateway" "$BUILD_SOURCESDIRECTORY/helm/istio-gateway" \
+                --namespace "$namespace" --set-string "env.name=$APP_ENV" --atomic --timeout 450s
+              kubectl -n "$namespace" wait "gateway/$gateway" --for=condition=Programmed --timeout=240s
+              wait_for_app_routes
+          env:
+            PLATFORM_ENV: ${{ parameters.platformEnv }}
+            APP_ENV: ${{ parameters.appEnv }}
