@@ -18,11 +18,6 @@ parameters:
   type: boolean
   default: false
 
-- name: deployDevHelmOnly
-  displayName: Deploy Dev Helm releases only
-  type: boolean
-  default: false
-
 resources:
   repositories:
   - repository: self
@@ -54,17 +49,17 @@ variables:
 - name: Service.Blogs.NameKebabCase
   value: 'codebuilddeploy-blogs'
 - name: Service.Blogs.Version
-  value: 1.1.94
+  value: 1.1.95
 
 - name: Service.Identity.NameKebabCase
   value: 'codebuilddeploy-identity'
 - name: Service.Identity.Version
-  value: 1.0.51
+  value: 1.0.52
 
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
 - name: Service.Web.Version
-  value: 1.1.90
+  value: 1.1.91
 
 name: $[variables['Build.Number']]
 
@@ -110,7 +105,7 @@ stages:
         workingDirectory: $(Build.SourcesDirectory)
         displayName: Tag Version in Git
 
-- ${{ if or(and(ne(parameters.deployDevHelmOnly, true), eq(variables['deploy.dev'], 'true')), and(parameters.deployDevHelmOnly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))) }}:
+- ${{ if eq(variables['deploy.dev'], 'true') }}:
   - stage: DeployDev
     displayName: Deploy NonProd Development Platform
     dependsOn:
@@ -142,44 +137,24 @@ stages:
         runOnce:
           deploy:
             steps:
-            - ${{ if ne(parameters.deployDevHelmOnly, true) }}:
-              - template: .ado/template-terraform.yml@subplatform
-                parameters:
-                  service_connection: '$(Azure.Subscription.NonProdEnterprise)'
-                  tenant_id: '$(Azure.TenantId)'
-                  tfuser_client_id: '$(Azure.Tf.User.ClientId)'
-                  kubelogin: true
-                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
-                  tfstate_rg_name: $(Tf.State.NonProdEnterprise.RG)
-                  tfstate_storage_account_name: $(Tf.State.NonProdEnterprise.SA)
-                  tfstate_blob_name: $(Tf.State.NonProdEnterprise.Blob)
-                  tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
-                  spoke_vars_file_name: '$(Deploy.AppEnvShort)'
-                  additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
-            - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
-              - ${{ if parameters.deployDevHelmOnly }}:
-                - checkout: self
-              - task: HelmDeploy@1
-                displayName: Deploy shared Dev Istio gateway and routes
-                inputs:
-                  connectionType: 'Azure Resource Manager'
-                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                  azureResourceGroup: 'cbd-nonprod-rg'
-                  kubernetesCluster: 'cbd-nonprod-aks-cluster'
-                  useClusterAdmin: true
-                  command: 'upgrade'
-                  arguments: '--atomic --timeout 450s'
-                  install: true
-                  namespace: 'cbd-nonprod-dev'
-                  releaseName: 'cbd-dev-istio-gateway'
-                  chartType: 'FilePath'
-                  chartPath: '$(Build.SourcesDirectory)/helm/dev-istio-gateway'
+            - template: .ado/template-terraform.yml@subplatform
+              parameters:
+                service_connection: '$(Azure.Subscription.NonProdEnterprise)'
+                tenant_id: '$(Azure.TenantId)'
+                tfuser_client_id: '$(Azure.Tf.User.ClientId)'
+                kubelogin: true
+                terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
+                tfstate_rg_name: $(Tf.State.NonProdEnterprise.RG)
+                tfstate_storage_account_name: $(Tf.State.NonProdEnterprise.SA)
+                tfstate_blob_name: $(Tf.State.NonProdEnterprise.Blob)
+                tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
+                spoke_vars_file_name: '$(Deploy.AppEnvShort)'
+                additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
 
     - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Blogs"
       displayName: "Deploy Blogs to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-      dependsOn:
-      - ProvisionDev
+      dependsOn: ProvisionDev
       strategy:
         runOnce:
           deploy:
@@ -194,6 +169,8 @@ stages:
                 kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
                 serviceNameKebabCase: '$(Service.Blogs.NameKebabCase)'
                 serviceVersion: '$(Service.Blogs.Version)'
+                ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+                  gatewayName: codebuilddeploy-dev
 
     - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Identity"
       displayName: "Deploy Identity to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
@@ -216,6 +193,8 @@ stages:
                 kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
                 serviceNameKebabCase: '$(Service.Identity.NameKebabCase)'
                 serviceVersion: '$(Service.Identity.Version)'
+                ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+                  gatewayName: codebuilddeploy-dev
         
     - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
       displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
@@ -238,8 +217,67 @@ stages:
                 kubernetesNamespace: "cbd-${{ variables['Deploy.PlatformEnv'] }}-${{ variables['Deploy.AppEnv'] }}"
                 serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
                 serviceVersion: '$(Service.Web.Version)'
+                ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+                  gatewayName: codebuilddeploy-dev
 
-  - ${{ if and(eq(variables['deploy.prod'], 'true'), ne(parameters.deployDevHelmOnly, true)) }}:
+    - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+      - deployment: DeployDevGateway
+        displayName: Deploy shared Dev Istio gateway
+        environment: 'NonProd-Dev'
+        dependsOn:
+        - Deploy_Dev_Web
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - checkout: self
+              - task: AzureCLI@3
+                displayName: Verify Dev HTTPRoute handoff
+                inputs:
+                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -euo pipefail
+                    export KUBECONFIG
+                    KUBECONFIG=$(mktemp)
+                    trap 'rm -f -- "$KUBECONFIG"' EXIT
+                    az aks get-credentials --resource-group cbd-nonprod-rg --name cbd-nonprod-aks-cluster --admin --overwrite-existing --file "$KUBECONFIG" --only-show-errors
+                    shared_route=$(kubectl -n cbd-nonprod-dev --request-timeout=15s get httproute codebuilddeploy-dev --ignore-not-found -o name)
+                    if [[ -z "$shared_route" ]]; then
+                      exit 0
+                    fi
+                    for _ in {1..12}; do
+                      if kubectl -n cbd-nonprod-dev --request-timeout=5s get httproute dev-codebuilddeploy-web dev-codebuilddeploy-blogs dev-codebuilddeploy-identity -o json |
+                        jq -e '(.items | length) == 3 and all(.items[];
+                          .metadata.generation as $generation |
+                          any(.status.parents[]?;
+                            .parentRef.name == "codebuilddeploy-dev" and
+                            ([.conditions[]? | select(.status == "True" and .observedGeneration == $generation) | .type] |
+                              contains(["Accepted", "ResolvedRefs"]))))' >/dev/null; then
+                        exit 0
+                      fi
+                      sleep 5
+                    done
+                    echo "Publish and pin all three app charts with accepted HTTPRoutes before removing the shared route." >&2
+                    exit 1
+              - task: HelmDeploy@1
+                displayName: Deploy shared Dev Istio gateway
+                inputs:
+                  connectionType: 'Azure Resource Manager'
+                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
+                  azureResourceGroup: 'cbd-nonprod-rg'
+                  kubernetesCluster: 'cbd-nonprod-aks-cluster'
+                  useClusterAdmin: true
+                  command: 'upgrade'
+                  arguments: '--atomic --timeout 450s'
+                  install: true
+                  namespace: 'cbd-nonprod-dev'
+                  releaseName: 'cbd-dev-istio-gateway'
+                  chartType: 'FilePath'
+                  chartPath: '$(Build.SourcesDirectory)/helm/dev-istio-gateway'
+
+  - ${{ if eq(variables['deploy.prod'], 'true') }}:
     - stage: DeployLive
       displayName: Deploy Prod Live Platform
       dependsOn:

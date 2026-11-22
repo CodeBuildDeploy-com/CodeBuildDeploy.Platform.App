@@ -15,6 +15,9 @@ parameters:
   type: string
 - name: serviceVersion
   type: string
+- name: gatewayName
+  type: string
+  default: ''
 
 steps:
 - checkout: none
@@ -47,3 +50,4 @@ steps:
       env.name=${{ parameters.appEnv }}
       env.shortName=${{ parameters.appEnvShort }}
       imageRegistry=${{ parameters.registryName }}.azurecr.io
+      ingress.gatewayName=${{ parameters.gatewayName }}
