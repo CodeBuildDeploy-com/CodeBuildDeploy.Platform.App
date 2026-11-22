@@ -110,7 +110,7 @@ stages:
         workingDirectory: $(Build.SourcesDirectory)
         displayName: Tag Version in Git
 
-- ${{ if or(eq(variables['deploy.dev'], 'true'), and(parameters.deployDevHelmOnly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))) }}:
+- ${{ if or(and(ne(parameters.deployDevHelmOnly, true), eq(variables['deploy.dev'], 'true')), and(parameters.deployDevHelmOnly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))) }}:
   - stage: DeployDev
     displayName: Deploy NonProd Development Platform
     dependsOn:
