@@ -1,9 +1,7 @@
 parameters:
 - name: azureSubscription
   type: string
-- name: acrRepositoryConnect
-  type: string
-- name: containerRegistry
+- name: registryName
   type: string
 - name: platformEnv
   type: string
@@ -28,7 +26,7 @@ steps:
     scriptType: bash
     scriptLocation: inlineScript
     inlineScript: |
-      az acr login --name ${{ parameters.containerRegistry }}
+      az acr login --name "${{ parameters.registryName }}"
 
 - task: HelmDeploy@1
   inputs:
@@ -43,8 +41,9 @@ steps:
     namespace: "${{ parameters.kubernetesNamespace }}"
     releaseName: "${{ parameters.appEnv }}-${{ parameters.serviceNameKebabCase }}"
     chartType: 'Name'
-    chartName: "oci://${{ parameters.containerRegistry }}/helm/${{ parameters.serviceNameKebabCase }}"
+    chartName: "oci://${{ parameters.registryName }}.azurecr.io/helm/${{ parameters.serviceNameKebabCase }}"
     chartVersion: "${{ parameters.serviceVersion }}"
     overrideValues: |
       env.name=${{ parameters.appEnv }}
       env.shortName=${{ parameters.appEnvShort }}
+      imageRegistry=${{ parameters.registryName }}.azurecr.io

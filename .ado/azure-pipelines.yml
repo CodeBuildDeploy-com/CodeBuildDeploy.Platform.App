@@ -49,17 +49,17 @@ variables:
 - name: Service.Blogs.NameKebabCase
   value: 'codebuilddeploy-blogs'
 - name: Service.Blogs.Version
-  value: 1.1.92
+  value: 1.1.93
 
 - name: Service.Identity.NameKebabCase
   value: 'codebuilddeploy-identity'
 - name: Service.Identity.Version
-  value: 1.0.49
+  value: 1.0.50
 
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
 - name: Service.Web.Version
-  value: 1.1.88
+  value: 1.1.89
 
 name: $[variables['Build.Number']]
 
@@ -163,8 +163,7 @@ stages:
             - template: app-deployment.yml
               parameters:
                 azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                acrRepositoryConnect: '$(Acr.Repository.Connect)'
-                containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                registryName: '$(Acr.Repository.Name)'
                 platformEnv: '$(Deploy.PlatformEnv)'
                 appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
                 appEnv: '$(Deploy.AppEnv)'
@@ -184,8 +183,7 @@ stages:
             - template: app-deployment.yml
               parameters:
                 azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                acrRepositoryConnect: '$(Acr.Repository.Connect)'
-                containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                registryName: '$(Acr.Repository.Name)'
                 platformEnv: '$(Deploy.PlatformEnv)'
                 appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
                 appEnv: '$(Deploy.AppEnv)'
@@ -205,8 +203,7 @@ stages:
             - template: app-deployment.yml
               parameters:
                 azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
-                acrRepositoryConnect: '$(Acr.Repository.Connect)'
-                containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                registryName: '$(Acr.Repository.Name)'
                 platformEnv: '$(Deploy.PlatformEnv)'
                 appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
                 appEnv: '$(Deploy.AppEnv)'
@@ -230,7 +227,52 @@ stages:
         value: live
       jobs:
 
+      - deployment: PromoteLiveArtifacts
+        displayName: Promote release artifacts to Prod ACR
+        environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - checkout: self
+              - task: AzureCLI@3
+                displayName: Resolve source registry
+                inputs:
+                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
+                  scriptType: bash
+                  scriptLocation: inlineScript
+                  inlineScript: |
+                    set -euo pipefail
+                    registry_id=$(az acr show --name "$SOURCE_REGISTRY" --resource-group cbd-nonprod-rg --query id -o tsv --only-show-errors)
+                    subscription_id=$(az account show --query id -o tsv --only-show-errors)
+                    test -n "$registry_id"
+                    test -n "$subscription_id"
+                    echo "##vso[task.setvariable variable=PromotionSourceRegistryId]$registry_id"
+                    echo "##vso[task.setvariable variable=PromotionSourceSubscription]$subscription_id"
+                env:
+                  SOURCE_REGISTRY: $(Acr.Repository.Name)
+              - task: AzureCLI@3
+                displayName: Import and verify pinned images and charts
+                inputs:
+                  azureSubscription: '$(Azure.Subscription.ProdPremium)'
+                  scriptType: bash
+                  scriptLocation: scriptPath
+                  scriptPath: '$(Build.SourcesDirectory)/.ado/promote-artifacts.sh'
+                env:
+                  SOURCE_REGISTRY: $(Acr.Repository.Name)
+                  SOURCE_REGISTRY_ID: $(PromotionSourceRegistryId)
+                  SOURCE_SUBSCRIPTION: $(PromotionSourceSubscription)
+                  TARGET_REGISTRY: $(Acr.Repository.ProdName)
+                  TARGET_RESOURCE_GROUP: cbd-prod-rg
+                  BLOGS_SERVICE: $(Service.Blogs.NameKebabCase)
+                  BLOGS_VERSION: $(Service.Blogs.Version)
+                  IDENTITY_SERVICE: $(Service.Identity.NameKebabCase)
+                  IDENTITY_VERSION: $(Service.Identity.Version)
+                  WEB_SERVICE: $(Service.Web.NameKebabCase)
+                  WEB_VERSION: $(Service.Web.Version)
+
       - deployment: ProvisionLive
+        dependsOn: PromoteLiveArtifacts
         displayName: Provision ${{ variables['Deploy.AppEnvShortCap'] }} Environment
         environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
         strategy:
@@ -263,8 +305,7 @@ stages:
               - template: app-deployment.yml
                 parameters:
                   azureSubscription: '$(Azure.Subscription.ProdPremium)'
-                  acrRepositoryConnect: '$(Acr.Repository.Connect)'
-                  containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                  registryName: '$(Acr.Repository.ProdName)'
                   platformEnv: '$(Deploy.PlatformEnv)'
                   appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
                   appEnv: '$(Deploy.AppEnv)'
@@ -284,8 +325,7 @@ stages:
               - template: app-deployment.yml
                 parameters:
                   azureSubscription: '$(Azure.Subscription.ProdPremium)'
-                  acrRepositoryConnect: '$(Acr.Repository.Connect)'
-                  containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                  registryName: '$(Acr.Repository.ProdName)'
                   platformEnv: '$(Deploy.PlatformEnv)'
                   appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
                   appEnv: '$(Deploy.AppEnv)'
@@ -294,7 +334,7 @@ stages:
                   serviceVersion: '$(Service.Identity.Version)'
           
       - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Web"
-        displayName: "Deploy Web to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
+        displayName: "Deploy Web to Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
         environment: "Prod-${{ variables['Deploy.AppEnvShortCap'] }}"
         dependsOn:
         - ProvisionLive
@@ -305,8 +345,7 @@ stages:
               - template: app-deployment.yml
                 parameters:
                   azureSubscription: '$(Azure.Subscription.ProdPremium)'
-                  acrRepositoryConnect: '$(Acr.Repository.Connect)'
-                  containerRegistry: '$(Acr.Repository.Name).azurecr.io'
+                  registryName: '$(Acr.Repository.ProdName)'
                   platformEnv: '$(Deploy.PlatformEnv)'
                   appEnvShort: "${{ variables['Deploy.AppEnvShort'] }}"
                   appEnv: '$(Deploy.AppEnv)'
