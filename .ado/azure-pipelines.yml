@@ -18,6 +18,11 @@ parameters:
   type: boolean
   default: false
 
+- name: deployDevHelmOnly
+  displayName: Deploy Dev Helm releases only
+  type: boolean
+  default: false
+
 resources:
   repositories:
   - repository: self
@@ -49,17 +54,17 @@ variables:
 - name: Service.Blogs.NameKebabCase
   value: 'codebuilddeploy-blogs'
 - name: Service.Blogs.Version
-  value: 1.1.93
+  value: 1.1.94
 
 - name: Service.Identity.NameKebabCase
   value: 'codebuilddeploy-identity'
 - name: Service.Identity.Version
-  value: 1.0.50
+  value: 1.0.51
 
 - name: Service.Web.NameKebabCase
   value: 'codebuilddeploy-web'
 - name: Service.Web.Version
-  value: 1.1.89
+  value: 1.1.90
 
 name: $[variables['Build.Number']]
 
@@ -105,7 +110,7 @@ stages:
         workingDirectory: $(Build.SourcesDirectory)
         displayName: Tag Version in Git
 
-- ${{ if eq(variables['deploy.dev'], 'true') }}:
+- ${{ if or(eq(variables['deploy.dev'], 'true'), and(parameters.deployDevHelmOnly, eq(variables['Build.SourceBranch'], 'refs/heads/main'))) }}:
   - stage: DeployDev
     displayName: Deploy NonProd Development Platform
     dependsOn:
@@ -137,19 +142,38 @@ stages:
         runOnce:
           deploy:
             steps:
-            - template: .ado/template-terraform.yml@subplatform
-              parameters: 
-                service_connection: '$(Azure.Subscription.NonProdEnterprise)'
-                tenant_id: '$(Azure.TenantId)'
-                tfuser_client_id: '$(Azure.Tf.User.ClientId)'
-                kubelogin: true
-                terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
-                tfstate_rg_name: $(Tf.State.NonProdEnterprise.RG)
-                tfstate_storage_account_name: $(Tf.State.NonProdEnterprise.SA)
-                tfstate_blob_name: $(Tf.State.NonProdEnterprise.Blob)
-                tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
-                spoke_vars_file_name: '$(Deploy.AppEnvShort)'
-                additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
+            - ${{ if ne(parameters.deployDevHelmOnly, true) }}:
+              - template: .ado/template-terraform.yml@subplatform
+                parameters:
+                  service_connection: '$(Azure.Subscription.NonProdEnterprise)'
+                  tenant_id: '$(Azure.TenantId)'
+                  tfuser_client_id: '$(Azure.Tf.User.ClientId)'
+                  kubelogin: true
+                  terraform_work_directory: '$(Build.SourcesDirectory)/terraform'
+                  tfstate_rg_name: $(Tf.State.NonProdEnterprise.RG)
+                  tfstate_storage_account_name: $(Tf.State.NonProdEnterprise.SA)
+                  tfstate_blob_name: $(Tf.State.NonProdEnterprise.Blob)
+                  tfstate_file_name: '$(Deploy.PlatformEnv)-$(Deploy.AppEnv)'
+                  spoke_vars_file_name: '$(Deploy.AppEnvShort)'
+                  additional_command_options: '-var="platform_env=$(Deploy.PlatformEnv)" -var="app_env=$(Deploy.AppEnv)"'
+            - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+              - ${{ if parameters.deployDevHelmOnly }}:
+                - checkout: self
+              - task: HelmDeploy@1
+                displayName: Deploy shared Dev Istio gateway and routes
+                inputs:
+                  connectionType: 'Azure Resource Manager'
+                  azureSubscription: '$(Azure.Subscription.NonProdEnterprise)'
+                  azureResourceGroup: 'cbd-nonprod-rg'
+                  kubernetesCluster: 'cbd-nonprod-aks-cluster'
+                  useClusterAdmin: true
+                  command: 'upgrade'
+                  arguments: '--atomic --timeout 450s'
+                  install: true
+                  namespace: 'cbd-nonprod-dev'
+                  releaseName: 'cbd-dev-istio-gateway'
+                  chartType: 'FilePath'
+                  chartPath: '$(Build.SourcesDirectory)/helm/dev-istio-gateway'
 
     - deployment: "Deploy_${{ variables['Deploy.AppEnvShortCap'] }}_Blogs"
       displayName: "Deploy Blogs to NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
@@ -176,6 +200,8 @@ stages:
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       dependsOn:
       - ProvisionDev
+      - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+        - Deploy_Dev_Blogs
       strategy:
         runOnce:
           deploy:
@@ -196,6 +222,8 @@ stages:
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       dependsOn:
       - ProvisionDev
+      - ${{ if eq(variables['Deploy.AppEnv'], 'dev') }}:
+        - Deploy_Dev_Identity
       strategy:
         runOnce:
           deploy:
@@ -211,7 +239,7 @@ stages:
                 serviceNameKebabCase: '$(Service.Web.NameKebabCase)'
                 serviceVersion: '$(Service.Web.Version)'
 
-  - ${{ if eq(variables['deploy.prod'], 'true') }}:
+  - ${{ if and(eq(variables['deploy.prod'], 'true'), ne(parameters.deployDevHelmOnly, true)) }}:
     - stage: DeployLive
       displayName: Deploy Prod Live Platform
       dependsOn:
