@@ -15,13 +15,12 @@ resource "azurerm_storage_account" "cbd_app_sa" {
 }
 
 resource "azurerm_storage_container" "cbd_app_sc" {
-  name                  = "cbd-${var.platform_env}-${var.app_env}-sc"
-  storage_account_name  = azurerm_storage_account.cbd_app_sa.name
+  name               = "cbd-${var.platform_env}-${var.app_env}-sc"
+  storage_account_id = azurerm_storage_account.cbd_app_sa.id
 }
 
 resource "azurerm_storage_blob" "cbd_app_sb" {
-  name                   = "DataProtectionKey"
-  storage_account_name   = azurerm_storage_account.cbd_app_sa.name
-  storage_container_name = azurerm_storage_container.cbd_app_sc.name
-  type                   = "Block"
+  name                 = "DataProtectionKey"
+  storage_container_id = azurerm_storage_container.cbd_app_sc.id
+  type                 = "Block"
 }

@@ -5,7 +5,7 @@ terraform {
     #https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.81.0"
+      version = "~> 5.14.0"
     }
     #https://registry.terraform.io/providers/hashicorp/azuread/latest/docs
     azuread = {
@@ -28,6 +28,12 @@ terraform {
 }
 
 provider "azurerm" {
+  resource_provider_registrations = "none"
+  resource_providers_to_register = [
+    "Microsoft.Sql",
+    "Microsoft.Storage",
+  ]
+
   features {
     key_vault {
       purge_soft_delete_on_destroy    = true
