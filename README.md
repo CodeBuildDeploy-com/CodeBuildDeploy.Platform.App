@@ -34,7 +34,18 @@ Run Platform.Environment in the target subscription first to install Istio and
 the Gateway API. The platform TLS certificate in Key Vault must cover the target
 hostnames. Dynamic deployments can use a wildcard certificate for both domains.
 Publish the matching DNS and Nginx Proxy Manager upstreams when an environment is
-ready to receive traffic. The gateway chart allowlists the router's static WAN IP.
+ready to receive traffic. The chart creates a private Azure Load Balancer frontend
+that only accepts traffic from the platform's WireGuard VM private address. The
+router needs a WireGuard route to that frontend before publishing the upstream.
+The App Terraform `aks_cluster_configure` module manages the gateway Helm release.
+It reads the WireGuard NIC and AKS subnet from Azure. Dev and Live use the eighth
+IP from the end of their AKS subnet. Dynamic deployments use an Azure-assigned IP.
+For an existing environment, Terraform upgrades the same-named release in place
+on its first apply. A new environment installs the release after the namespace
+and TLS secret are available. The App deployment jobs release Blogs, Identity and
+Web, then verify that Istio has accepted their routes.
+Use the private Service's load balancer IP as the Nginx Proxy Manager upstream.
+The generated Istio Service uses ClusterIP.
 
 # terraform
 This folder contains the terraform used to provission the acual environments and all its associated infrastructure.

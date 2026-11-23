@@ -1,5 +1,6 @@
 env:
   name: null
 
-# Static WAN addresses that reach Azure from Nginx Proxy Manager.
-originAllowedIpRanges: "87.192.98.248/32"
+# Supplied by the App Terraform Helm release.
+privateFrontendAddress: null
+wireguardSourceRange: null

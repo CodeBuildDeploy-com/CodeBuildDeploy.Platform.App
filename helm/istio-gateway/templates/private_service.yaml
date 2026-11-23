@@ -1,0 +1,29 @@
+{{- $env := required "env.name is required" .Values.env.name }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: codebuilddeploy-{{ $env }}-private
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+    {{- with .Values.privateFrontendAddress }}
+    service.beta.kubernetes.io/azure-load-balancer-ipv4: {{ . | quote }}
+    {{- end }}
+    service.beta.kubernetes.io/port_443_health-probe_protocol: "Http"
+    service.beta.kubernetes.io/port_443_health-probe_port: "status-port"
+    service.beta.kubernetes.io/port_443_health-probe_request-path: "/healthz/ready"
+    service.beta.kubernetes.io/port_15021_no_lb_rule: "true"
+spec:
+  type: LoadBalancer
+  loadBalancerSourceRanges:
+    - {{ required "wireguardSourceRange from App Terraform is required" .Values.wireguardSourceRange | quote }}
+  selector:
+    gateway.networking.k8s.io/gateway-name: codebuilddeploy-{{ $env }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: 443
+      appProtocol: https
+    - name: status-port
+      port: 15021
+      targetPort: 15021
+      appProtocol: tcp

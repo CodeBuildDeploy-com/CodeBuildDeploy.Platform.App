@@ -44,17 +44,16 @@ jobs:
               serviceNameKebabCase: ${{ format('$(Service.{0}.NameKebabCase)', service.name) }}
               serviceVersion: ${{ format('$(Service.{0}.Version)', service.name) }}
 
-- deployment: DeployGateway
-  displayName: Deploy shared Istio gateway to ${{ parameters.deploymentEnvironment }}
+- deployment: VerifyAppIngress
+  displayName: Verify Istio app routes in ${{ parameters.deploymentEnvironment }}
   environment: ${{ parameters.deploymentEnvironment }}
   dependsOn: DeployWeb
   strategy:
     runOnce:
       deploy:
         steps:
-        - checkout: self
         - task: AzureCLI@3
-          displayName: Deploy Istio gateway and verify app routes
+          displayName: Verify the gateway and app routes
           inputs:
             azureSubscription: ${{ parameters.azureSubscription }}
             scriptType: bash
@@ -87,13 +86,6 @@ jobs:
                 return 1
               }
 
-              shared_route=$(kubectl -n "$namespace" --request-timeout=15s get httproute "$gateway" --ignore-not-found -o name)
-              if [[ -n "$shared_route" ]]; then
-                wait_for_app_routes
-              fi
-
-              helm upgrade --install "cbd-$APP_ENV-istio-gateway" "$BUILD_SOURCESDIRECTORY/helm/istio-gateway" \
-                --namespace "$namespace" --set-string "env.name=$APP_ENV" --atomic --timeout 450s
               kubectl -n "$namespace" wait "gateway/$gateway" --for=condition=Programmed --timeout=240s
               wait_for_app_routes
           env:
