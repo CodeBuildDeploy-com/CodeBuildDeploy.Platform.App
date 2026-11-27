@@ -1,6 +1,7 @@
 locals {
-  istio_gateway_chart   = "${path.root}/../helm/istio-gateway"
-  stable_istio_frontend = contains(["dev", "live"], var.app_env)
+  istio_gateway_chart = "${path.root}/../helm/istio-gateway"
+  # CI uses a different address so it can run alongside Dev during cutover.
+  istio_frontend_host = lookup({ ci = -9, dev = -8, live = -8 }, var.app_env, null)
 }
 
 data "azurerm_network_interface" "wireguard" {
@@ -9,7 +10,7 @@ data "azurerm_network_interface" "wireguard" {
 }
 
 data "azurerm_subnet" "aks_ingress" {
-  count = local.stable_istio_frontend ? 1 : 0
+  count = local.istio_frontend_host != null ? 1 : 0
 
   name                 = "cbd-${var.platform_env}-subnet-aks"
   resource_group_name  = data.azurerm_resource_group.cbd_plat_rg.name
@@ -29,9 +30,8 @@ resource "helm_release" "istio_gateway" {
   timeout         = 450
 
   values = [yamlencode({
-    env = { name = var.app_env }
-    # Use the eighth address from the end of the AKS subnet for permanent environments.
-    privateFrontendAddress = local.stable_istio_frontend ? cidrhost(one(data.azurerm_subnet.aks_ingress[0].address_prefixes), -8) : null
+    env                    = { name = var.app_env }
+    privateFrontendAddress = local.istio_frontend_host != null ? cidrhost(one(data.azurerm_subnet.aks_ingress[0].address_prefixes), local.istio_frontend_host) : null
     wireguardSourceRange   = "${data.azurerm_network_interface.wireguard.private_ip_address}/32"
   })]
 

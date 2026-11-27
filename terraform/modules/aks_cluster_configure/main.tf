@@ -7,7 +7,7 @@ resource "kubernetes_namespace" "cbd_app_namespace" {
 resource "kubernetes_secret" "cbd_app_kubernetes_pull_secret" {
   metadata {
     name      = "cbd-pull-secret"
-    namespace = "cbd-${var.platform_env}-${var.app_env}"
+    namespace = kubernetes_namespace.cbd_app_namespace.metadata[0].name
   }
 
   type = "kubernetes.io/dockerconfigjson"
@@ -30,7 +30,7 @@ resource "kubernetes_secret" "cbd_app_kubernetes_pull_secret" {
 resource "kubernetes_secret" "cbd_app_secret_ssl_cert" {
   metadata {
     name      = "cbd-${var.app_env}-ssl-cert"
-    namespace = "cbd-${var.platform_env}-${var.app_env}"
+    namespace = kubernetes_namespace.cbd_app_namespace.metadata[0].name
   }
 
   type = "kubernetes.io/tls"
@@ -44,7 +44,7 @@ resource "kubernetes_secret" "cbd_app_secret_ssl_cert" {
 resource "kubernetes_secret" "cbd_app_kubernetes_secret" {
   metadata {
     name      = "cbd-${var.app_env}-secret"
-    namespace = "cbd-${var.platform_env}-${var.app_env}"
+    namespace = kubernetes_namespace.cbd_app_namespace.metadata[0].name
   }
 
   type = "Opaque"
@@ -68,7 +68,7 @@ resource "kubernetes_secret" "cbd_app_kubernetes_secret" {
 resource "kubernetes_config_map" "cbd_app_kubernetes_config_map" {
   metadata {
     name      = "cbd-${var.app_env}-configmap"
-    namespace = "cbd-${var.platform_env}-${var.app_env}"
+    namespace = kubernetes_namespace.cbd_app_namespace.metadata[0].name
   }
 
   data = {

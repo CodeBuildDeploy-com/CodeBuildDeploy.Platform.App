@@ -3,20 +3,20 @@ parameters:
     type: boolean
   - name: isRelease
     type: boolean
-  - name: deployDev
+  - name: deployCI
     type: boolean
   - name: deployQA
     type: boolean
 
 variables:
   ${{ if eq(parameters.isManual, 'true') }}:
-    deploy.dev: ${{ parameters.deployDev }}
+    deploy.ci: ${{ parameters.deployCI }}
     deploy.qa: ${{ parameters.deployQA }}
   ${{ if and(ne(parameters.isManual, 'true'), eq(parameters.isRelease, 'true')) }}:
-    deploy.dev: 'true'
+    deploy.ci: 'true'
     deploy.qa: 'true'
   ${{ if and(ne(parameters.isManual, 'true'), ne(parameters.isRelease, 'true')) }}:
-    deploy.dev: 'false'
+    deploy.ci: 'false'
     deploy.qa: 'false'
 
   ${{ if eq(parameters.isRelease, 'true') }}:

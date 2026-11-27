@@ -42,13 +42,17 @@ data "azurerm_key_vault_secret" "cbd_app_microsoft_client_secret" {
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 
+locals {
+  tls_secret_prefix = var.app_env == "ci" ? "cbd-${var.platform_env}-ci-tls" : "cbd-${var.platform_env}-tls"
+}
+
 data "azurerm_key_vault_secret" "cbd_plat_tls_cert" {
-  name         = "cbd-${var.platform_env}-tls-cert"
+  name         = "${local.tls_secret_prefix}-cert"
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 
 data "azurerm_key_vault_secret" "cbd_plat_tls_key" {
-  name         = "cbd-${var.platform_env}-tls-key"
+  name         = "${local.tls_secret_prefix}-key"
   key_vault_id = data.azurerm_key_vault.cbd_subscription_kv.id
 }
 

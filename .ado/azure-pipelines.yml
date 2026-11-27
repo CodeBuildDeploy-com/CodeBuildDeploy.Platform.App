@@ -8,13 +8,13 @@ pool:
   vmImage: ubuntu-latest
 
 parameters:
-- name: deployDev
-  displayName: Deploy to Dev
+- name: deployCI
+  displayName: Deploy to CI
   type: boolean
   default: false
 
 - name: deployQA
-  displayName: Deploy to QA (must Deploy to Dev too)
+  displayName: Deploy to QA (must deploy to CI too)
   type: boolean
   default: false
 
@@ -37,7 +37,7 @@ variables:
   parameters:
     isManual: ${{ variables['build.type.manual'] }}
     isRelease: ${{ variables['build.type.release'] }}
-    deployDev: ${{ parameters.deployDev }}
+    deployCI: ${{ parameters.deployCI }}
     deployQA: ${{ parameters.deployQA }}
 
 - template: .ado/variables-versioning.yml@subplatform
@@ -105,12 +105,13 @@ stages:
         workingDirectory: $(Build.SourcesDirectory)
         displayName: Tag Version in Git
 
-- ${{ if eq(variables['deploy.dev'], 'true') }}:
-  - stage: DeployDev
-    displayName: Deploy NonProd Development Platform
+- ${{ if eq(variables['deploy.ci'], 'true') }}:
+  - stage: DeployCI
+    displayName: Deploy NonProd CI or dynamic environment
     dependsOn:
     - Build_Umbrella
     variables:
+    # This is the existing Azure DevOps variable group shared with dynamic deployments.
     - group: CodeBuildDeploy-NonProd-Dev
     - name: Deploy.PlatformEnv
       value: nonprod
@@ -123,14 +124,14 @@ stages:
         value: "dyn-${{ variables['Build.SourceVersion.Short'] }}"
     - ${{ if eq(variables['build.type.release'], 'true') }}:
       - name: Deploy.AppEnvShortCap
-        value: Dev
+        value: CI
       - name: Deploy.AppEnvShort
-        value: dev
+        value: ci
       - name: Deploy.AppEnv
-        value: dev
+        value: ci
     jobs:
 
-    - deployment: ProvisionDev
+    - deployment: ProvisionCI
       displayName: Provision ${{ variables['Deploy.AppEnvShortCap'] }} Environment
       environment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
       strategy:
@@ -159,13 +160,13 @@ stages:
         appEnvShort: '$(Deploy.AppEnvShort)'
         appEnv: '$(Deploy.AppEnv)'
         deploymentEnvironment: "NonProd-${{ variables['Deploy.AppEnvShortCap'] }}"
-        provisionJob: ProvisionDev
+        provisionJob: ProvisionCI
 
   - ${{ if eq(variables['deploy.prod'], 'true') }}:
     - stage: DeployLive
       displayName: Deploy Prod Live Platform
       dependsOn:
-      - DeployDev
+      - DeployCI
       variables:
       - name: Deploy.PlatformEnv
         value: prod

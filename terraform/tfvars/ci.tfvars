@@ -1,6 +1,6 @@
 subscription_friendly_name  = "enterprise"
 platform_env                = "nonprod"
-app_env                     = "dev"
+app_env                     = "ci"
 default_location            = "uksouth"
 container_registry          = "codebuilddeploynonprod.azurecr.io"
 container_registry_username = "codebuilddeploynonprod"
